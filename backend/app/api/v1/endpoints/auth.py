@@ -55,28 +55,25 @@ async def register(
 @router.post("/login", response_model=Token)
 async def login(
     login_data: UserLogin,
-    tenant: CurrentTenant,
     db: DB,
 ):
-    """Login and get access token."""
-    query = select(User).where(
-        User.tenant_id == tenant.id,
-        User.email == login_data.email,
-    )
+    """Login and get access token. Finds user by email across all tenants."""
+    # Find user by email (email is unique per tenant, but we search globally for simplicity)
+    query = select(User).where(User.email == login_data.email)
     result = await db.execute(query)
     user = result.scalar_one_or_none()
 
     if not user or not verify_password(login_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+            detail="Email ou senha incorretos",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="User account is disabled",
+            detail="Conta desativada",
         )
 
     # Create tokens

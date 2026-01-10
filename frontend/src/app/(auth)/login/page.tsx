@@ -10,23 +10,16 @@ import { useAuth } from '@/hooks/useAuth'
 
 export default function LoginPage() {
   const router = useRouter()
-  const { login, isLoading, setTenantSlug } = useAuth()
+  const { login, isLoading } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [tenantSlug, setTenantSlugLocal] = useState('')
   const [error, setError] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
 
-    if (!tenantSlug) {
-      setError('Informe o codigo da organizacao')
-      return
-    }
-
     try {
-      setTenantSlug(tenantSlug)
       await login(email, password)
       router.push('/dashboard')
     } catch (err: any) {
@@ -56,18 +49,6 @@ export default function LoginPage() {
               {error}
             </div>
           )}
-          <div className="space-y-2">
-            <label htmlFor="tenant" className="text-sm font-medium">
-              Codigo da Organizacao
-            </label>
-            <Input
-              id="tenant"
-              placeholder="minha-escola"
-              value={tenantSlug}
-              onChange={(e) => setTenantSlugLocal(e.target.value.toLowerCase())}
-              required
-            />
-          </div>
           <div className="space-y-2">
             <label htmlFor="email" className="text-sm font-medium">
               Email

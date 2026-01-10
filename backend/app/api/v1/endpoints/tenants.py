@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Body, HTTPException, status
 from sqlalchemy import select
 
 from app.api.deps import AdminUser, CurrentTenant, DB
@@ -15,9 +15,9 @@ router = APIRouter()
 
 @router.post("/", response_model=TenantResponse, status_code=status.HTTP_201_CREATED)
 async def create_tenant(
-    tenant_in: TenantCreate,
-    admin_user: UserCreate,
     db: DB,
+    tenant_in: TenantCreate = Body(..., embed=True),
+    admin_user: UserCreate = Body(..., embed=True),
 ):
     """
     Create a new tenant (organization) with an admin user.

@@ -39,21 +39,27 @@ export default function RegisterPage() {
     try {
       // Create tenant with admin user
       await api.post('/tenants/', {
-        name: orgName,
-        slug: orgSlug,
-      }, {
-        params: {
-          admin_user: JSON.stringify({
-            email,
-            password,
-            full_name: fullName,
-          }),
+        tenant_in: {
+          name: orgName,
+          slug: orgSlug,
+        },
+        admin_user: {
+          email,
+          password,
+          full_name: fullName,
         },
       })
 
       router.push(`/login?registered=true&slug=${orgSlug}`)
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Erro ao criar organizacao')
+      const detail = err.response?.data?.detail
+      if (Array.isArray(detail)) {
+        setError(detail.map((e: any) => e.msg).join(', '))
+      } else if (typeof detail === 'string') {
+        setError(detail)
+      } else {
+        setError('Erro ao criar organizacao')
+      }
     } finally {
       setIsLoading(false)
     }

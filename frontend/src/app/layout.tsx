@@ -16,7 +16,7 @@ const pixel = Silkscreen({ subsets: ['latin'], weight: ['400', '700'], variable:
 
 export const metadata: Metadata = {
   title: { default: 'Duvis Cup', template: '%s · Duvis Cup' },
-  description: 'A liga de tênis da nossa turma — com macacos-prego.',
+  description: 'A liga de tênis da nossa turma.',
 }
 
 export const viewport: Viewport = {

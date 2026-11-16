@@ -66,4 +66,4 @@ def group_invite(name: str, group_link: str, app_url: str) -> str:
     return (f"🎾 Oi, {name}! Sua entrada na Duvis Cup foi aprovada.\n\n"
             f"Entra no grupo da liga (avisos, resultados e as zoeiras):\n{group_link}\n\n"
             f"O app da liga: {app_url}\n"
-            "Cuidado com os macacos. 🐒")
+            "Nos vemos na quadra! 🎾")

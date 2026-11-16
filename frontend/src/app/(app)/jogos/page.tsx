@@ -74,7 +74,7 @@ export default function MyMatches() {
 
       <section>
         <h2 className="mb-3 font-display text-xl font-semibold">Pendentes</h2>
-        {pending.length === 0 ? <Empty>Nada pendente. Nem o macaco tem do que reclamar.</Empty> : (
+        {pending.length === 0 ? <Empty>Nada pendente. Quadra liberada.</Empty> : (
           <div className="grid gap-3 sm:grid-cols-2">
             {pending.map((m) => <MatchCard key={m.id} match={m} highlight={uid}>{actions(m)}</MatchCard>)}
           </div>
@@ -96,7 +96,7 @@ export default function MyMatches() {
             <ErrorBox error={error} />
             <ScoreForm match={reporting} allowed={['normal', 'retired']} busy={report.isPending}
               onSubmit={(p) => { setError(null); report.mutate(p) }} />
-            <p className="text-xs text-muted-foreground">W.O. é declarado pela organização. Chuva, falta de luz ou macaco na quadra? Avise a organização.</p>
+            <p className="text-xs text-muted-foreground">W.O. é declarado pela organização. Chuva, falta de luz ou algum bicho na quadra? Avise a organização.</p>
           </div>
         )}
       </Modal>

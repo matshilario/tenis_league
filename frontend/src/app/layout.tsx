@@ -1,23 +1,18 @@
-import type { Metadata } from "next"
-import { Inter } from "next/font/google"
-import "./globals.css"
-import { Providers } from "./providers"
-
-const inter = Inter({ subsets: ["latin"] })
+import type { Metadata, Viewport } from 'next'
+import './globals.css'
+import { Providers } from './providers'
 
 export const metadata: Metadata = {
-  title: "Tennis League",
-  description: "Manage your tennis leagues, matches, and rankings",
+  title: 'Liga de Tênis',
+  description: 'A liga do nosso grupo de tênis',
 }
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode
-}>) {
+export const viewport: Viewport = { width: 'device-width', initialScale: 1 }
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
+    <html lang="pt-BR">
+      <body>
         <Providers>{children}</Providers>
       </body>
     </html>

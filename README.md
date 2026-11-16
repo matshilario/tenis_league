@@ -1,213 +1,63 @@
-# Tennis League SaaS
+# Liga de Tênis
 
-Sistema multi-tenant para gerenciamento de ligas de tenis amadoras.
+App da liga do nosso grupo de tênis: classificação, resultados, mata-mata e painel da
+organização, seguindo o [regulamento](frontend/src/content/regulamento.md).
 
-## Funcionalidades
+- **Backend:** FastAPI + SQLAlchemy (async) + PostgreSQL — `backend/`
+- **Frontend:** Next.js 14 + Tailwind + React Query — `frontend/`
+- **Avisos:** WhatsApp do grupo via serviço `agents-notify`
 
-- **Multi-tenant**: Cada escola/clube tem seu proprio ambiente isolado
-- **Gestao de Jogadores**: Cadastro e perfil de jogadores
-- **Ligas e Rankings**: Sistema ELO ou por pontos
-- **Partidas**: Registro com confirmacao dupla
-- **Torneios**: Chaves eliminatorias automaticas
-- **Agendamento**: Sistema de propostas de horarios
+## Como funciona
 
-## Stack Tecnologica
+| Regra | Onde |
+|---|---|
+| Placar (2 sets, tie-break, super tie-break), pontuação 10/3/1, W.O., abandono | `backend/app/domain/scoring.py` |
+| Desempate (6 critérios, confronto direto só entre dois) | `backend/app/domain/standings.py` |
+| Grupos (1 ou 2), serpentina, todos contra todos, semis, folgas | `backend/app/domain/draw.py` |
+| Contestação 48h, retirada (§9), 2 W.O., homologação, chave | `backend/app/services/league.py` |
+| Textos dos avisos do grupo | `backend/app/services/messages.py` |
 
-### Backend
-- FastAPI (Python 3.11+)
-- SQLAlchemy + Alembic
-- PostgreSQL
-- JWT Authentication
+A classificação é sempre recalculada a partir das partidas — editar, anular ou retirar
+jogadores nunca deixa a tabela inconsistente.
 
-### Frontend
-- Next.js 14 (App Router)
-- TypeScript
-- Tailwind CSS
-- shadcn/ui
-- React Query
+**Fluxo:** admin gera convite → pessoa se cadastra → admin aprova (e inscreve na
+categoria) → admin ordena níveis e sorteia → jogadores lançam placar, adversário confirma
+ou contesta em 48h → admin resolve contestações, W.O., interrupções → homologa → semis →
+final → campeão.
 
-### Infraestrutura
-- Docker + Docker Compose
-- Railway (deploy)
-
-## Requisitos
-
-- Docker e Docker Compose
-- Make (opcional, mas recomendado)
-
-## Inicio Rapido
-
-### 1. Clone o repositorio
+## Rodando local
 
 ```bash
-git clone <repo-url>
-cd tenis_league
+# backend (sem Docker: SQLite)
+cd backend
+python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
+export DATABASE_URL=sqlite+aiosqlite:///./dev.db
+.venv/bin/alembic upgrade head
+.venv/bin/python -m app.cli create-admin voce@email.com "Seu Nome"
+.venv/bin/uvicorn app.main:app --reload            # http://localhost:8000/api/v1/docs
+
+# frontend
+cd frontend && npm install && npm run dev          # http://localhost:3000
 ```
 
-### 2. Configure o ambiente
+Com Docker: `docker compose up -d` e depois
+`docker compose exec backend python -m app.cli create-admin voce@email.com "Seu Nome"`.
 
-```bash
-# Copie os arquivos de exemplo
-cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env
-```
+Testes: `cd backend && .venv/bin/pytest`.
 
-### 3. Inicie os containers
+## Variáveis (backend)
 
-```bash
-# Com Make
-make up
+| Variável | Uso |
+|---|---|
+| `DATABASE_URL` | Postgres (aceita o `postgres://` da Railway) |
+| `SECRET_KEY` | chave dos tokens — gere uma longa e aleatória |
+| `CORS_ORIGINS`, `FRONTEND_URL` | URL do frontend (CORS e links de convite) |
+| `NOTIFY_URL`, `NOTIFY_TOKEN`, `NOTIFY_TARGET` | avisos no WhatsApp; `NOTIFY_TARGET` = JID do grupo (`…@g.us`). Vazio = só log |
 
-# Ou diretamente com Docker
-docker compose up -d
-```
+Frontend: `NEXT_PUBLIC_API_URL` (URL pública do backend, definida no build).
 
-### 4. Execute as migracoes
+## Deploy (Railway)
 
-```bash
-# Com Make
-make migrate
-
-# Ou diretamente
-docker compose exec backend alembic upgrade head
-```
-
-### 5. Acesse
-
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:8000
-- **API Docs**: http://localhost:8000/api/v1/docs
-
-## Comandos Uteis
-
-```bash
-# Ver todos os comandos disponiveis
-make help
-
-# Iniciar containers
-make up
-
-# Parar containers
-make down
-
-# Ver logs
-make logs
-make logs-backend
-make logs-frontend
-
-# Executar migracoes
-make migrate
-
-# Criar nova migracao
-make migrate-create NAME="descricao_da_migracao"
-
-# Rodar testes
-make test
-
-# Acessar shell do container
-make shell-backend
-make shell-frontend
-```
-
-## Estrutura do Projeto
-
-```
-tenis_league/
-├── backend/
-│   ├── app/
-│   │   ├── api/v1/endpoints/  # Endpoints da API
-│   │   ├── core/              # Configuracoes e seguranca
-│   │   ├── models/            # Modelos SQLAlchemy
-│   │   ├── schemas/           # Schemas Pydantic
-│   │   ├── services/          # Logica de negocio
-│   │   └── main.py
-│   ├── alembic/               # Migracoes
-│   ├── tests/
-│   └── pyproject.toml
-├── frontend/
-│   ├── src/
-│   │   ├── app/               # Paginas Next.js
-│   │   ├── components/        # Componentes React
-│   │   ├── hooks/             # Custom hooks
-│   │   ├── lib/               # Utilitarios e API client
-│   │   └── types/             # TypeScript types
-│   └── package.json
-├── docker-compose.yml
-├── Makefile
-└── README.md
-```
-
-## Sistema de Ranking
-
-### ELO
-- Rating inicial: 1500 pontos
-- Formula: `Novo Rating = Rating Atual + K × (Resultado - Expectativa)`
-- Fator K: 32
-- Considera margem de vitoria
-
-### Pontos
-- Vitoria: +3 pontos
-- Derrota: +1 ponto
-- WO dado: 0 pontos
-- WO recebido: +3 pontos
-
-## Deploy no Railway
-
-1. Crie um projeto no Railway
-2. Adicione um servico PostgreSQL
-3. Conecte seu repositorio GitHub
-4. Configure as variaveis de ambiente:
-
-```
-# Backend
-DATABASE_URL=${{Postgres.DATABASE_URL}}
-SECRET_KEY=<gere-uma-chave-segura>
-CORS_ORIGINS=https://seu-frontend.railway.app
-
-# Frontend
-NEXT_PUBLIC_API_URL=https://seu-backend.railway.app
-```
-
-## API Endpoints
-
-### Autenticacao
-- `POST /api/v1/auth/register` - Registrar usuario
-- `POST /api/v1/auth/login` - Login
-- `GET /api/v1/auth/me` - Usuario atual
-
-### Tenants
-- `POST /api/v1/tenants/` - Criar organizacao
-- `GET /api/v1/tenants/current` - Organizacao atual
-
-### Jogadores
-- `GET /api/v1/players/` - Listar jogadores
-- `POST /api/v1/players/` - Criar jogador
-- `GET /api/v1/players/{id}` - Detalhes do jogador
-
-### Ligas
-- `GET /api/v1/leagues/` - Listar ligas
-- `POST /api/v1/leagues/` - Criar liga
-- `POST /api/v1/leagues/{id}/players` - Adicionar jogador
-
-### Partidas
-- `GET /api/v1/matches/` - Listar partidas
-- `POST /api/v1/matches/` - Registrar partida
-- `POST /api/v1/matches/{id}/confirm` - Confirmar resultado
-
-### Rankings
-- `GET /api/v1/rankings/league/{id}` - Ranking da liga
-- `GET /api/v1/rankings/head-to-head` - Confronto direto
-
-### Torneios
-- `GET /api/v1/tournaments/` - Listar torneios
-- `POST /api/v1/tournaments/` - Criar torneio
-- `POST /api/v1/tournaments/{id}/generate-bracket` - Gerar chaves
-
-### Agendamento
-- `GET /api/v1/schedules/` - Listar agendamentos
-- `POST /api/v1/schedules/` - Propor horario
-- `POST /api/v1/schedules/{id}/respond` - Responder proposta
-
-## Licenca
-
-MIT
+Dois serviços apontando para este repo — `backend/` e `frontend/` como *root directory* —
+mais um Postgres. O backend roda as migrações ao subir. O JID do grupo precisa estar em
+`ALLOWED_NUMBERS` do serviço notify.

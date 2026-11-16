@@ -1,133 +1,85 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, HTTPException, status
+from sqlalchemy import func, select
 
-from app.api.deps import DB, CurrentTenant, CurrentUser
-from app.core.security import (
-    create_access_token,
-    create_refresh_token,
-    decode_token,
-    get_password_hash,
-    verify_password,
-)
-from app.models.user import User, UserRole
-from app.schemas.user import Token, UserCreate, UserLogin, UserResponse
+from app.api.deps import DB, AnyUser
+from app.core.security import create_access_token, get_password_hash, verify_password
+from app.models import Invite, User, UserStatus, aware, utcnow
+from app.schemas import InviteCheck, LoginIn, ProfileIn, RegisterIn, TokenOut, UserOut
 
 router = APIRouter()
 
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def register(
-    user_in: UserCreate,
-    tenant: CurrentTenant,
-    db: DB,
-):
-    """Register a new user in a tenant."""
-    # Check if email already exists in tenant
-    query = select(User).where(
-        User.tenant_id == tenant.id,
-        User.email == user_in.email,
-    )
-    result = await db.execute(query)
-    existing_user = result.scalar_one_or_none()
+def invite_problem(inv: Invite | None) -> str | None:
+    if not inv:
+        return "Convite não encontrado."
+    if inv.revoked:
+        return "Este convite foi cancelado."
+    if inv.uses >= inv.max_uses:
+        return "Este convite já foi usado."
+    if inv.expires_at and aware(inv.expires_at) < utcnow():
+        return "Este convite expirou."
+    return None
 
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered in this organization",
-        )
 
-    # Create user
-    user = User(
-        tenant_id=tenant.id,
-        email=user_in.email,
-        hashed_password=get_password_hash(user_in.password),
-        full_name=user_in.full_name,
-        role=user_in.role,
-    )
+async def _find_invite(db, token: str) -> Invite | None:
+    res = await db.execute(select(Invite).where(Invite.token == token))
+    return res.scalars().first()
+
+
+@router.get("/invite/{token}", response_model=InviteCheck)
+async def check_invite(token: str, db: DB):
+    inv = await _find_invite(db, token)
+    problem = invite_problem(inv)
+    return InviteCheck(valid=problem is None, note=inv.note if inv else None, reason=problem)
+
+
+@router.post("/register", response_model=TokenOut, status_code=201)
+async def register(body: RegisterIn, db: DB):
+    inv = await _find_invite(db, body.invite_token)
+    problem = invite_problem(inv)
+    if problem:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, problem)
+    email = body.email.lower().strip()
+    exists = await db.execute(select(User).where(func.lower(User.email) == email))
+    if exists.scalars().first():
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Este e-mail já tem cadastro.")
+    user = User(email=email, hashed_password=get_password_hash(body.password),
+                name=body.name.strip(), nickname=(body.nickname or "").strip() or None,
+                phone=body.phone, invite_id=inv.id, status=UserStatus.PENDING)
+    inv.uses += 1
     db.add(user)
     await db.flush()
-    await db.refresh(user)
+    return TokenOut(access_token=create_access_token(str(user.id)),
+                    user=UserOut.model_validate(user))
 
+
+@router.post("/login", response_model=TokenOut)
+async def login(body: LoginIn, db: DB):
+    res = await db.execute(select(User).where(func.lower(User.email) == body.email.lower()))
+    user = res.scalars().first()
+    if not user or not verify_password(body.password, user.hashed_password):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "E-mail ou senha incorretos.")
+    if user.status in (UserStatus.REJECTED, UserStatus.REMOVED):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Acesso não autorizado.")
+    return TokenOut(access_token=create_access_token(str(user.id)),
+                    user=UserOut.model_validate(user))
+
+
+@router.get("/me", response_model=UserOut)
+async def me(user: AnyUser):
     return user
 
 
-@router.post("/login", response_model=Token)
-async def login(
-    login_data: UserLogin,
-    db: DB,
-):
-    """Login and get access token. Finds user by email across all tenants."""
-    # Find user by email (email is unique per tenant, but we search globally for simplicity)
-    query = select(User).where(User.email == login_data.email)
-    result = await db.execute(query)
-    user = result.scalar_one_or_none()
-
-    if not user or not verify_password(login_data.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email ou senha incorretos",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Conta desativada",
-        )
-
-    # Create tokens
-    token_data = {
-        "sub": str(user.id),
-        "tenant_id": str(user.tenant_id),
-        "role": user.role.value,
-    }
-
-    return Token(
-        access_token=create_access_token(token_data),
-        refresh_token=create_refresh_token(token_data),
-    )
-
-
-@router.post("/refresh", response_model=Token)
-async def refresh_token(
-    refresh_token: str,
-    db: DB,
-):
-    """Refresh access token using refresh token."""
-    payload = decode_token(refresh_token)
-
-    if not payload or payload.get("type") != "refresh":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid refresh token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    user_id = payload.get("sub")
-    query = select(User).where(User.id == user_id, User.is_active == True)
-    result = await db.execute(query)
-    user = result.scalar_one_or_none()
-
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
-        )
-
-    token_data = {
-        "sub": str(user.id),
-        "tenant_id": str(user.tenant_id),
-        "role": user.role.value,
-    }
-
-    return Token(
-        access_token=create_access_token(token_data),
-        refresh_token=create_refresh_token(token_data),
-    )
-
-
-@router.get("/me", response_model=UserResponse)
-async def get_current_user_info(current_user: CurrentUser):
-    """Get current user information."""
-    return current_user
+@router.patch("/me", response_model=UserOut)
+async def update_me(body: ProfileIn, user: AnyUser, db: DB):
+    data = body.model_dump(exclude_unset=True)
+    if "password" in data:
+        pw = data.pop("password")
+        if pw:
+            user.hashed_password = get_password_hash(pw)
+    for k, v in data.items():
+        if k == "name" and not v:
+            continue
+        setattr(user, k, (v or "").strip() or None if k != "name" else v.strip())
+    await db.flush()
+    return user

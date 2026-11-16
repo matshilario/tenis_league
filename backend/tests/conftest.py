@@ -1,48 +1,48 @@
-import asyncio
-from typing import AsyncGenerator, Generator
+import os
+import tempfile
 
-import pytest
-import pytest_asyncio
-from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+_db = os.path.join(tempfile.mkdtemp(), "test.db")
+os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{_db}"
+os.environ["NOTIFY_URL"] = ""
 
-from app.core.database import Base, get_db
-from app.main import app
+import pytest  # noqa: E402
+import pytest_asyncio  # noqa: E402
+from httpx import ASGITransport, AsyncClient  # noqa: E402
 
-# Test database URL
-TEST_DATABASE_URL = "sqlite+aiosqlite:///./test.db"
-
-engine = create_async_engine(TEST_DATABASE_URL, echo=True)
-TestSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-
-
-@pytest.fixture(scope="session")
-def event_loop() -> Generator:
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
+from app.core.database import AsyncSessionLocal, Base, engine  # noqa: E402
+from app.core.security import get_password_hash  # noqa: E402
+from app.main import app  # noqa: E402
+from app.models import Role, User, UserStatus  # noqa: E402
+from app.services import notify  # noqa: E402
 
 
-@pytest_asyncio.fixture(scope="function")
-async def db_session() -> AsyncGenerator[AsyncSession, None]:
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+@pytest.fixture
+def sent(monkeypatch):
+    msgs: list[str] = []
 
-    async with TestSessionLocal() as session:
-        yield session
+    async def fake_send(text):
+        msgs.append(text)
+        return True
 
+    monkeypatch.setattr(notify, "send", fake_send)
+    return msgs
+
+
+@pytest_asyncio.fixture
+async def client(sent):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(Base.metadata.create_all)
+    async with AsyncSessionLocal() as db:
+        db.add(User(email="admin@liga.com", name="Organizador", nickname="Chefe",
+                    hashed_password=get_password_hash("segredo"), role=Role.ADMIN,
+                    status=UserStatus.APPROVED))
+        await db.commit()
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+        yield c
 
 
-@pytest_asyncio.fixture(scope="function")
-async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
-    async def override_get_db():
-        yield db_session
-
-    app.dependency_overrides[get_db] = override_get_db
-
-    async with AsyncClient(app=app, base_url="http://test") as ac:
-        yield ac
-
-    app.dependency_overrides.clear()
+async def login(c, email, pw="segredo"):
+    r = await c.post("/api/v1/auth/login", json={"email": email, "password": pw})
+    assert r.status_code == 200, r.text
+    return {"Authorization": f"Bearer {r.json()['access_token']}"}

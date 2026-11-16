@@ -26,9 +26,8 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://tennis:tennis@db:5432/tennis_league
       SECRET_KEY: dev-secret-key-change-in-production
-      ALGORITHM: HS256
-      ACCESS_TOKEN_EXPIRE_MINUTES: 30
       CORS_ORIGINS: http://localhost:3000
+      FRONTEND_URL: http://localhost:3000
     depends_on:
       db:
         condition: service_healthy
@@ -45,7 +44,6 @@ services:
       - "3000:3000"
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:8000
-      NEXT_PUBLIC_APP_DOMAIN: localhost:3000
     volumes:
       - ./frontend/src:/app/src
       - ./frontend/public:/app/public

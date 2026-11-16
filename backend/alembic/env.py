@@ -9,7 +9,7 @@ from alembic import context
 
 from app.core.config import settings
 from app.core.database import Base
-from app.models import *  # noqa: F401, F403
+import app.models  # noqa: F401  (registra as tabelas)
 
 config = context.config
 
@@ -18,7 +18,7 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+config.set_main_option("sqlalchemy.url", settings.database_url)
 
 
 def run_migrations_offline() -> None:

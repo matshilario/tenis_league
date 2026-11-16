@@ -96,7 +96,7 @@ export default function MyMatches() {
             <ErrorBox error={error} />
             <ScoreForm match={reporting} allowed={['normal', 'retired']} busy={report.isPending}
               onSubmit={(p) => { setError(null); report.mutate(p) }} />
-            <p className="text-xs text-muted-foreground">W.O. é declarado pela organização. Chuva, falta de luz ou algum bicho na quadra? Avise a organização.</p>
+            <p className="text-xs text-muted-foreground">W.O. é declarado pela organização. Chuva, falta de luz ou primata na quadra? Avise a organização.</p>
           </div>
         )}
       </Modal>

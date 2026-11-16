@@ -28,7 +28,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <h1 className="font-display text-2xl font-bold">Cadastro recebido!</h1>
           <p className="mt-2 text-muted-foreground">
             Oi, {me.data.display_name}. A organização precisa aprovar sua entrada na liga.
-            Enquanto isso, vai aquecendo o saque.
+            Enquanto isso, fica de olho nos macacos.
           </p>
           <div className="mt-5 flex justify-center gap-2">
             <Button variant="secondary" onClick={() => me.refetch()}>Verificar de novo</Button>

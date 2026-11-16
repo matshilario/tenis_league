@@ -40,7 +40,7 @@ export default function Home() {
     return (
       <div className="space-y-6">
         <RevealTitle text={`Bora pra quadra, ${first}?`} className="text-display font-bold" />
-        <Empty>A organização ainda não abriu a primeira temporada. A quadra está sendo preparada.</Empty>
+        <Empty>A organização ainda não abriu a primeira temporada. Os primatas estão aquecendo.</Empty>
       </div>
     )
   }

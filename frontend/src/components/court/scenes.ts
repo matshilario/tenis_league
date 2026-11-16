@@ -101,7 +101,8 @@ function* pointEnd(e: CourtEngine): Script {
 }
 
 function* rally(e: CourtEngine): Script {
-  const n = Math.floor(rand(2, 6))
+  // até a primeira aparição do macaco, pontos curtos: ele entra logo
+  const n = e.monkeySeen ? Math.floor(rand(2, 6)) : 1
   for (let i = 0; i < n; i++) yield* shot(e)
   yield* pointEnd(e)
   yield* backToCenter(e)
@@ -110,7 +111,7 @@ function* rally(e: CourtEngine): Script {
 
 function* serveAndRally(e: CourtEngine): Script {
   yield* serve(e)
-  const n = Math.floor(rand(1, 4))
+  const n = e.monkeySeen ? Math.floor(rand(1, 4)) : 0
   for (let i = 0; i < n; i++) yield* shot(e)
   yield* pointEnd(e)
   yield* backToCenter(e)
@@ -243,7 +244,7 @@ export const SCENES: SceneDef[] = [
   { id: 'rally', track: 'main', weight: 5, run: rally },
   { id: 'serve', track: 'main', weight: 2, run: serveAndRally },
   { id: 'monkey-ball', track: 'main', weight: 3, monkey: true, run: monkeyStealsBall },
-  { id: 'monkey-poop', track: 'main', weight: 8, monkey: true, run: monkeyPoop },
+  { id: 'monkey-poop', track: 'main', weight: 10, monkey: true, run: monkeyPoop },
   { id: 'monkey-watch', track: 'ambient', weight: 1, run: monkeyWatches },
   { id: 'monkey-bottle', track: 'ambient', weight: 1, when: (e) => !!e.geo.bench && e.bottleOnBench, run: monkeyBottle },
 ]

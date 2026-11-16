@@ -266,7 +266,7 @@ export class CourtEngine {
   private scale = 2
   private dpr = 1
   private font = 'monospace'
-  private firstMonkeyAt = rand(10, 18)
+  private firstMonkeyAt = rand(8, 12)
   private cooldown = MONKEY_COOLDOWN
 
   constructor(private canvas: HTMLCanvasElement, private scenes: SceneDef[]) {

@@ -25,6 +25,23 @@ categoria) → admin ordena níveis e sorteia → jogadores lançam placar, adve
 ou contesta em 48h → admin resolve contestações, W.O., interrupções → homologa → semis →
 final → campeão.
 
+## Visual (Duvis Cup)
+
+- **Ideia:** a página é a quadra do adversário; a faixa no rodapé é o nosso lado, com a
+  borda de cima servindo de rede. O tenista troca bolas que passam por cima da rede e, de
+  vez em quando, um macaco-prego entra para roubar a bola ou a garrafa d'água.
+- **Quadra:** `frontend/src/components/court/` — `sprites.ts` (pixel art em grades),
+  `engine.ts` (cenário, física, desenho), `scenes.ts` (banco de cenas). Para criar uma
+  cena, escreva um gerador e registre em `SCENES`. `?macaco` na URL acelera as aparições;
+  `?macaco=monkey-ball` força uma cena específica.
+- **Tipografia:** Fraunces (títulos e números grandes), Public Sans (interface e
+  tabelas, com números tabulares) e Silkscreen (detalhes em pixel, só textos curtos).
+- **Cores:** creme, verde-quadra, oliva, lima da bola, azul-marinho e terra batida
+  (`globals.css`), com versão "sessão noturna" no modo escuro.
+- **Origem dos recursos:** logo e ícone do app derivados da arte fornecida pela
+  organização (`public/brand/`); sprites desenhados à mão no código; ícones Solar via
+  Iconify (CC BY 4.0, embutidos por `npm run icons`); fontes Google Fonts (OFL).
+
 ## Rodando local
 
 ```bash

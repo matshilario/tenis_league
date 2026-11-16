@@ -1,6 +1,11 @@
 import { clsx, type ClassValue } from 'clsx'
-import { twMerge } from 'tailwind-merge'
+import { extendTailwindMerge } from 'tailwind-merge'
 import type { EntryStatus, Match, MatchStatus, Phase } from './types'
+
+// ensina ao tailwind-merge os tamanhos de fonte próprios (senão viram "cor" e somem)
+const twMerge = extendTailwindMerge({
+  extend: { classGroups: { 'font-size': [{ text: ['display', 'title', 'eyebrow'] }] } },
+})
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))

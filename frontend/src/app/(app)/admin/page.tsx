@@ -7,6 +7,7 @@ import { InvitesTab } from '@/components/admin/InvitesTab'
 import { MatchesTab } from '@/components/admin/MatchesTab'
 import { MembersTab } from '@/components/admin/MembersTab'
 import { SeasonTab } from '@/components/admin/SeasonTab'
+import { PageHeader } from '@/components/PageHeader'
 import { Card } from '@/components/ui'
 import { api } from '@/lib/api'
 import { useMe } from '@/lib/auth'
@@ -36,12 +37,12 @@ export default function AdminPage() {
 
   return (
     <div className="space-y-5">
-      <h1 className="text-2xl font-bold">Painel da organização</h1>
+      <PageHeader eyebrow="Só a organização vê" title="Painel da organização" />
       <div className="flex gap-1 overflow-x-auto border-b" role="tablist">
         {TABS.map((t) => (
           <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)}
-            className={cn('-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-sm',
-              tab === t.id ? 'border-primary font-semibold' : 'border-transparent text-muted-foreground hover:text-foreground')}>
+            className={cn('-mb-px whitespace-nowrap border-b-[3px] px-3 py-2.5 text-[15px] font-semibold',
+              tab === t.id ? 'border-lime text-ink dark:text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground')}>
             {t.label}
             {!!badge[t.id] && <span className="ml-1 rounded-full bg-destructive px-1.5 text-xs text-destructive-foreground">{badge[t.id]}</span>}
           </button>

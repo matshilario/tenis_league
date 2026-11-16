@@ -2,6 +2,7 @@
 
 import { Bracket } from '@/components/Bracket'
 import { CategoryPicker } from '@/components/CategoryPicker'
+import { PageHeader } from '@/components/PageHeader'
 import { Spinner } from '@/components/ui'
 import { useCategory } from '@/lib/useCategory'
 
@@ -10,10 +11,9 @@ export default function BracketPage() {
   if (detail.isLoading || !detail.data) return <Spinner />
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-bold">Semifinais e final</h1>
+      <PageHeader eyebrow="Mata-mata" title="Semifinais e final">
         <CategoryPicker categories={categories} value={categoryId} onChange={choose} />
-      </div>
+      </PageHeader>
       <Bracket matches={detail.data.matches} champion={detail.data.champion} />
       <p className="text-xs text-muted-foreground">
         {detail.data.category.n_groups === 2

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { AuthFrame } from '@/components/AuthFrame'
 import { Button, Card, ErrorBox, Field, Input } from '@/components/ui'
 import { api, errorMessage, tokenStore } from '@/lib/api'
 
@@ -25,10 +26,10 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
-      <Card className="w-full max-w-sm p-6">
-        <h1 className="text-center text-2xl font-bold">🎾 Liga de Tênis</h1>
-        <p className="mb-6 mt-1 text-center text-sm text-muted-foreground">Entre com sua conta</p>
+    <AuthFrame>
+      <Card className="p-6">
+        <h1 className="font-display text-2xl font-bold">Entrar em quadra</h1>
+        <p className="mb-5 mt-1 text-sm text-muted-foreground">Sua conta da liga.</p>
         <form onSubmit={submit} className="space-y-4">
           <Field label="E-mail">
             <Input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -37,12 +38,12 @@ export default function LoginPage() {
             <Input type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
           </Field>
           <ErrorBox error={error} />
-          <Button type="submit" disabled={busy} className="w-full">{busy ? 'Entrando…' : 'Entrar'}</Button>
+          <Button type="submit" size="lg" disabled={busy} className="w-full">{busy ? 'Entrando…' : 'Entrar'}</Button>
         </form>
-        <p className="mt-6 text-center text-xs text-muted-foreground">
-          Ainda não tem conta? A entrada é só por convite da organização.
-        </p>
       </Card>
-    </div>
+      <p className="mt-5 text-center text-sm text-muted-foreground">
+        Ainda não joga com a gente? A entrada é por convite da organização.
+      </p>
+    </AuthFrame>
   )
 }

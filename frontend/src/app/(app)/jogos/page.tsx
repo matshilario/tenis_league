@@ -4,7 +4,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { MatchCard } from '@/components/MatchCard'
 import { ScoreForm, type ScorePayload } from '@/components/ScoreForm'
-import { Button, ErrorBox, Field, Modal, Spinner, Textarea } from '@/components/ui'
+import { PageHeader } from '@/components/PageHeader'
+import { Button, Empty, ErrorBox, Field, Modal, Spinner, Textarea } from '@/components/ui'
 import { api, errorMessage } from '@/lib/api'
 import { useMe } from '@/lib/auth'
 import type { Match } from '@/lib/types'
@@ -65,17 +66,15 @@ export default function MyMatches() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Meus jogos</h1>
-        <p className="text-sm text-muted-foreground">
-          O vencedor lança o placar em até 24h. O adversário tem 48h para confirmar ou contestar;
-          sem contestação, o resultado vale automaticamente (§10).
-        </p>
-      </div>
+      <PageHeader eyebrow="Seu lado da quadra" title="Meus jogos" />
+      <p className="-mt-4 max-w-2xl text-sm text-muted-foreground">
+        O vencedor lança o placar em até 24h. O adversário tem 48h para confirmar ou contestar;
+        sem contestação, o resultado vale automaticamente (§10).
+      </p>
 
       <section>
-        <h2 className="mb-2 font-semibold">Pendentes</h2>
-        {pending.length === 0 ? <p className="text-sm text-muted-foreground">Nada pendente. 🎉</p> : (
+        <h2 className="mb-3 font-display text-xl font-semibold">Pendentes</h2>
+        {pending.length === 0 ? <Empty>Nada pendente. Nem o macaco tem do que reclamar.</Empty> : (
           <div className="grid gap-3 sm:grid-cols-2">
             {pending.map((m) => <MatchCard key={m.id} match={m} highlight={uid}>{actions(m)}</MatchCard>)}
           </div>
@@ -84,7 +83,7 @@ export default function MyMatches() {
 
       {done.length > 0 && (
         <section>
-          <h2 className="mb-2 font-semibold">Encerrados</h2>
+          <h2 className="mb-3 font-display text-xl font-semibold">Encerrados</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             {done.map((m) => <MatchCard key={m.id} match={m} highlight={uid} />)}
           </div>
@@ -97,7 +96,7 @@ export default function MyMatches() {
             <ErrorBox error={error} />
             <ScoreForm match={reporting} allowed={['normal', 'retired']} busy={report.isPending}
               onSubmit={(p) => { setError(null); report.mutate(p) }} />
-            <p className="text-xs text-muted-foreground">W.O. é declarado pela organização. Partida interrompida por chuva? Avise a organização.</p>
+            <p className="text-xs text-muted-foreground">W.O. é declarado pela organização. Chuva, falta de luz ou macaco na quadra? Avise a organização.</p>
           </div>
         )}
       </Modal>

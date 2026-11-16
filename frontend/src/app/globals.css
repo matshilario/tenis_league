@@ -2,50 +2,85 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Tokens provisórios — a fase estética redefine a paleta. */
+/*
+ * Duvis Cup — paleta tirada das referências: creme de papel, verde de quadra,
+ * oliva, lima da bola, azul-marinho e terra batida. Canais RGB para usar opacidade.
+ */
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    --primary: 142 64% 30%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 210 40% 94%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 45%;
-    --accent: 74 90% 50%;
-    --accent-foreground: 222 47% 11%;
-    --destructive: 0 72% 50%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 214 32% 89%;
-    --input: 214 32% 85%;
-    --ring: 142 64% 30%;
-    --radius: 0.5rem;
+    --paper: 246 239 223;
+    --ink: 16 55 42;
+    --court: 30 107 73;
+    --court-deep: 17 69 48;
+    --olive: 111 122 43;
+    --olive-soft: 222 222 168;
+    --lime: 211 219 59;
+    --lime-deep: 150 158 20;
+    --navy: 46 74 104;
+    --clay: 196 138 85;
+
+    --background: var(--paper);
+    --foreground: var(--ink);
+    --card: 252 248 238;
+    --muted: 237 230 210;
+    --muted-foreground: 86 104 92;
+    --border: 225 215 189;
+    --input: 206 196 168;
+    --ring: var(--court);
+    --primary: var(--court-deep);
+    --primary-foreground: 252 248 238;
+    --secondary: 231 225 196;
+    --secondary-foreground: var(--ink);
+    --accent: var(--lime);
+    --accent-foreground: 26 42 18;
+    --destructive: 178 52 40;
+    --destructive-foreground: 255 250 240;
+    --shadow: 60 50 20;
+    color-scheme: light;
   }
+
+  /* "sessão noturna": quadra sob refletores */
   @media (prefers-color-scheme: dark) {
     :root {
-      --background: 222 30% 8%;
-      --foreground: 210 40% 96%;
-      --card: 222 28% 11%;
-      --card-foreground: 210 40% 96%;
-      --popover: 222 28% 11%;
-      --popover-foreground: 210 40% 96%;
-      --primary: 142 60% 45%;
-      --primary-foreground: 222 47% 8%;
-      --secondary: 217 25% 18%;
-      --secondary-foreground: 210 40% 96%;
-      --muted: 217 25% 15%;
-      --muted-foreground: 215 20% 65%;
-      --destructive: 0 65% 55%;
-      --border: 217 25% 20%;
-      --input: 217 25% 25%;
-      --ring: 142 60% 45%;
+      --ink: 239 232 214;
+      --court: 62 154 109;
+      --olive-soft: 46 56 33;
+      --background: 13 26 21;
+      --foreground: 239 232 214;
+      --card: 19 36 29;
+      --muted: 27 46 38;
+      --muted-foreground: 163 177 162;
+      --border: 36 58 47;
+      --input: 52 78 64;
+      --ring: 211 219 59;
+      --primary: 62 154 109;
+      --primary-foreground: 9 22 16;
+      --secondary: 30 51 41;
+      --secondary-foreground: 239 232 214;
+      --destructive: 226 104 88;
+      --destructive-foreground: 20 10 8;
+      --shadow: 0 0 0;
+      color-scheme: dark;
     }
   }
+
   * { @apply border-border; }
-  body { @apply bg-background text-foreground antialiased; }
+  html { -webkit-tap-highlight-color: transparent; }
+  body {
+    @apply bg-background font-sans text-[15px] text-foreground antialiased sm:text-base;
+    font-feature-settings: 'tnum' 0;
+  }
+  h1, h2, h3 { @apply font-display; font-variation-settings: 'SOFT' 50, 'WONK' 0; }
+  :focus-visible { outline: 2px solid rgb(var(--ring)); outline-offset: 2px; }
+  ::selection { background: rgb(var(--lime) / 0.6); color: rgb(26 42 18); }
+}
+
+@layer utilities {
+  .tabular { font-variant-numeric: tabular-nums; }
+  .pixelated { image-rendering: pixelated; image-rendering: crisp-edges; }
+  .eyebrow { @apply font-pixel text-eyebrow uppercase text-navy dark:text-lime; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }

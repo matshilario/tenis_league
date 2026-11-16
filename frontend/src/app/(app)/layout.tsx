@@ -3,7 +3,8 @@
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { AppShell } from '@/components/AppShell'
-import { Spinner } from '@/components/ui'
+import { AuthFrame } from '@/components/AuthFrame'
+import { Button, Card, Spinner } from '@/components/ui'
 import { tokenStore } from '@/lib/api'
 import { useLogout, useMe } from '@/lib/auth'
 
@@ -22,18 +23,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (me.data.status === 'pending') {
     return (
-      <div className="mx-auto max-w-md px-4 py-16 text-center">
-        <div className="text-4xl">⏳</div>
-        <h1 className="mt-3 text-xl font-semibold">Cadastro recebido!</h1>
-        <p className="mt-2 text-muted-foreground">
-          Oi, {me.data.display_name}. A organização precisa aprovar sua entrada na liga.
-          Assim que aprovar, é só voltar aqui.
-        </p>
-        <div className="mt-6 flex justify-center gap-4 text-sm">
-          <button className="underline" onClick={() => me.refetch()}>Verificar de novo</button>
-          <button className="text-muted-foreground underline" onClick={logout}>Sair</button>
-        </div>
-      </div>
+      <AuthFrame>
+        <Card className="p-6 text-center">
+          <h1 className="font-display text-2xl font-bold">Cadastro recebido!</h1>
+          <p className="mt-2 text-muted-foreground">
+            Oi, {me.data.display_name}. A organização precisa aprovar sua entrada na liga.
+            Enquanto isso, fica de olho nos macacos.
+          </p>
+          <div className="mt-5 flex justify-center gap-2">
+            <Button variant="secondary" onClick={() => me.refetch()}>Verificar de novo</Button>
+            <Button variant="ghost" onClick={logout}>Sair</Button>
+          </div>
+        </Card>
+      </AuthFrame>
     )
   }
 

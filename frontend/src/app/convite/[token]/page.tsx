@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 import { useState } from 'react'
+import { AuthFrame } from '@/components/AuthFrame'
 import { Button, Card, ErrorBox, Field, Input, Spinner } from '@/components/ui'
 import { api, errorMessage, tokenStore } from '@/lib/api'
 
@@ -30,18 +31,19 @@ export default function InvitePage({ params }: { params: { token: string } }) {
 
   if (check.isLoading) return <Spinner />
   return (
-    <div className="flex min-h-screen items-center justify-center px-4 py-10">
-      <Card className="w-full max-w-sm p-6">
-        <h1 className="text-center text-2xl font-bold">🎾 Você foi convidado!</h1>
+    <AuthFrame>
+      <Card className="p-6">
+        <h1 className="font-display text-2xl font-bold">Você foi convidado!</h1>
         {!check.data?.valid ? (
-          <div className="mt-4 space-y-4 text-center">
+          <div className="mt-4 space-y-4">
             <ErrorBox error={check.data?.reason || 'Convite inválido.'} />
             <Link href="/login" className="text-sm underline">Já tenho conta</Link>
           </div>
         ) : (
           <>
-            <p className="mb-6 mt-1 text-center text-sm text-muted-foreground">
-              Crie sua conta. A organização aprova a entrada em seguida.
+            <p className="mb-5 mt-1 text-sm text-muted-foreground">
+              Crie sua conta. A organização aprova a entrada em seguida
+              {check.data?.note ? ` (convite: ${check.data.note})` : ''}.
             </p>
             <form onSubmit={submit} className="space-y-3">
               <Field label="Nome"><Input required minLength={2} value={f.name} onChange={set('name')} /></Field>
@@ -56,11 +58,11 @@ export default function InvitePage({ params }: { params: { token: string } }) {
                 <Input type="password" required minLength={6} autoComplete="new-password" value={f.password} onChange={set('password')} />
               </Field>
               <ErrorBox error={error} />
-              <Button type="submit" disabled={busy} className="w-full">{busy ? 'Criando…' : 'Criar conta'}</Button>
+              <Button type="submit" size="lg" disabled={busy} className="w-full">{busy ? 'Criando…' : 'Criar conta'}</Button>
             </form>
           </>
         )}
       </Card>
-    </div>
+    </AuthFrame>
   )
 }

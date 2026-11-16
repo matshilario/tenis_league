@@ -75,6 +75,19 @@ Frontend: `NEXT_PUBLIC_API_URL` (URL pública do backend, definida no build).
 
 ## Deploy (Railway)
 
-Dois serviços apontando para este repo — `backend/` e `frontend/` como *root directory* —
-mais um Postgres. O backend roda as migrações ao subir. O JID do grupo precisa estar em
-`ALLOWED_NUMBERS` do serviço notify.
+Projeto `duvis-cup`: serviços `backend` (pasta raiz `/backend`), `frontend` (pasta raiz
+`/frontend`) e `Postgres`. Cada pasta tem um `railway.json` (build por Dockerfile); o
+backend roda as migrações ao subir.
+
+```bash
+# a partir de uma cópia do repo no disco do Linux (ver aviso abaixo)
+railway up -s backend -c
+railway up -s frontend -c
+railway ssh -s backend "cd /app && python -m app.cli create-admin EMAIL NOME --senha SENHA"
+```
+
+- `NEXT_PUBLIC_API_URL` (frontend) entra no build: mudou o domínio da API, refaça o deploy do frontend.
+- Domínio próprio: atualizar `CORS_ORIGINS` e `FRONTEND_URL` no backend e `NEXT_PUBLIC_API_URL` no frontend.
+- O JID do grupo (`NOTIFY_TARGET`) precisa estar em `ALLOWED_NUMBERS` do serviço notify.
+- ⚠️ No WSL, `railway up` a partir de `/mnt/c/...` envia arquivos corrompidos (o build falha
+  com "dockerfile parse error on line 1"). Faça o deploy de um clone no disco do Linux.

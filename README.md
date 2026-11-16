@@ -75,6 +75,7 @@ Frontend: `NEXT_PUBLIC_API_URL` (URL pública do backend, definida no build).
 
 ## Deploy (Railway)
 
+No ar em **https://duviscup.com.br** (API em `https://api.duviscup.com.br`; DNS na Hostinger).
 Projeto `duvis-cup`: serviços `backend` (pasta raiz `/backend`), `frontend` (pasta raiz
 `/frontend`) e `Postgres`. Cada pasta tem um `railway.json` (build por Dockerfile); o
 backend roda as migrações ao subir.

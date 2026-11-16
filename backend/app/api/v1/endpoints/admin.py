@@ -54,6 +54,7 @@ from app.schemas import (
 )
 from app.services import league as L
 from app.services import messages as M
+from app.services import notify as N
 
 router = APIRouter()
 
@@ -129,8 +130,35 @@ async def approve_user(user_id: uuid.UUID, body: ApproveIn, admin: Admin, db: DB
             raise bad(str(exc))
     await L.audit(db, admin, "approve", f"{user.display_name} aprovado")
     outbox.add(M.member_approved(user.display_name))
+    invite = group_invite_text(user)
+    if invite and user.phone:
+        outbox.add(invite, number=user.phone)  # convite do grupo, em privado
     await db.flush()
     return user
+
+
+def group_invite_text(user: User) -> str | None:
+    if not settings.WHATSAPP_GROUP_LINK:
+        return None
+    return M.group_invite(user.display_name, settings.WHATSAPP_GROUP_LINK,
+                          settings.FRONTEND_URL.rstrip("/"))
+
+
+@router.post("/users/{user_id}/group-invite")
+async def send_group_invite(user_id: uuid.UUID, admin: Admin, db: DB):
+    """Reenvia (na hora) o convite do grupo do WhatsApp para um membro aprovado."""
+    user = await _get(db, User, user_id, "Usuário")
+    if user.status != UserStatus.APPROVED:
+        raise bad("Só membros aprovados recebem o convite do grupo.")
+    if not user.phone:
+        raise bad(f"{user.display_name} não tem WhatsApp cadastrado.")
+    text = group_invite_text(user)
+    if not text:
+        raise bad("Link do grupo não configurado (WHATSAPP_GROUP_LINK).")
+    if not await N.send(text, user.phone):
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "O WhatsApp não confirmou o envio. Tente de novo.")
+    await L.audit(db, admin, "group_invite", f"Convite do grupo enviado para {user.display_name}")
+    return {"sent": True, "phone": user.phone}
 
 
 @router.post("/users/{user_id}/reject", response_model=UserOut)

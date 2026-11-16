@@ -20,7 +20,7 @@ export default function InvitePage({ params }: { params: { token: string } }) {
     setError(null)
     try {
       const r = await api.register({ invite_token: params.token, ...f,
-        nickname: f.nickname || undefined, phone: f.phone || undefined })
+        nickname: f.nickname || undefined, phone: f.phone })
       tokenStore.set(r.access_token)
       window.location.href = '/'
     } catch (err) {
@@ -51,8 +51,9 @@ export default function InvitePage({ params }: { params: { token: string } }) {
                 <Input value={f.nickname} onChange={set('nickname')} maxLength={60} />
               </Field>
               <Field label="E-mail"><Input type="email" required autoComplete="email" value={f.email} onChange={set('email')} /></Field>
-              <Field label="WhatsApp" hint="Opcional, para a organização falar com você.">
-                <Input type="tel" value={f.phone} onChange={set('phone')} />
+              <Field label="WhatsApp" hint="Com DDD. Quando você for aprovado, o convite do grupo da liga chega por aqui.">
+                <Input type="tel" required autoComplete="tel" inputMode="tel" placeholder="(92) 99999-9999"
+                  value={f.phone} onChange={set('phone')} />
               </Field>
               <Field label="Senha" hint="Mínimo 6 caracteres.">
                 <Input type="password" required minLength={6} autoComplete="new-password" value={f.password} onChange={set('password')} />

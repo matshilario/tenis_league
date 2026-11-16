@@ -20,8 +20,8 @@ from app.services import notify  # noqa: E402
 def sent(monkeypatch):
     msgs: list[str] = []
 
-    async def fake_send(text):
-        msgs.append(text)
+    async def fake_send(text, number=None):
+        msgs.append(text if number is None else f"[para {number}] {text}")
         return True
 
     monkeypatch.setattr(notify, "send", fake_send)

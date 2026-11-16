@@ -20,7 +20,7 @@ async def setup_league(c, n=5):
         token = r.json()["token"]
         assert r.json()["url"].endswith(f"/convite/{token}")
         r = await c.post(f"{API}/auth/register", json={
-            "invite_token": token, "email": f"p{i}@x.com", "password": "segredo",
+            "invite_token": token, "email": f"p{i}@x.com", "password": "segredo", "phone": f"(92) 9{i:04d}-0000",
             "name": f"Jogador {i}", "nickname": f"P{i}"})
         assert r.status_code == 201, r.text
         uid = r.json()["user"]["id"]
@@ -53,7 +53,7 @@ def oriented(m, winner, sets):
 async def test_convite_obrigatorio_e_seguranca(client):
     c = client
     r = await c.post(f"{API}/auth/register", json={
-        "invite_token": "nao-existe", "email": "x@x.com", "password": "segredo", "name": "Xis"})
+        "invite_token": "nao-existe", "email": "x@x.com", "password": "segredo", "name": "Xis", "phone": "92999990000"})
     assert r.status_code == 400
     adm, cat_id, players = await setup_league(c, 4)
     # jogador comum não acessa o admin
@@ -62,10 +62,10 @@ async def test_convite_obrigatorio_e_seguranca(client):
     r = await c.post(f"{API}/admin/invites", json={}, headers=adm)
     tok = r.json()["token"]
     ok = await c.post(f"{API}/auth/register", json={
-        "invite_token": tok, "email": "a@x.com", "password": "segredo", "name": "Ana"})
+        "invite_token": tok, "email": "a@x.com", "password": "segredo", "name": "Ana", "phone": "92999990001"})
     assert ok.status_code == 201
     again = await c.post(f"{API}/auth/register", json={
-        "invite_token": tok, "email": "b@x.com", "password": "segredo", "name": "Bia"})
+        "invite_token": tok, "email": "b@x.com", "password": "segredo", "name": "Bia", "phone": "92999990002"})
     assert again.status_code == 400
     # recusar cadastro corta o acesso
     uid = ok.json()["user"]["id"]
@@ -224,7 +224,7 @@ async def test_retirada_apos_concluir_mantem_resultados_e_substituicao(client):
     r = await c.post(f"{API}/admin/invites", json={}, headers=adm)
     r = await c.post(f"{API}/auth/register", json={
         "invite_token": r.json()["token"], "email": "novo@x.com", "password": "segredo",
-        "name": "Novato", "nickname": "Novato"})
+        "name": "Novato", "nickname": "Novato", "phone": "92999990003"})
     new_id = r.json()["user"]["id"]
     await c.post(f"{API}/admin/users/{new_id}/approve", json={}, headers=adm)
     e3 = next(e for e in d["entries"] if e["user"]["display_name"] == "P3")
@@ -297,3 +297,43 @@ async def test_dois_grupos_e_lista_de_espera(client):
     r1 = [m for m in d["matches"] if m["round"] == 1]
     assert {m["deadline"] for m in r1} == {"2027-03-07"}
     assert d["category"]["makeup_deadline"] == "2027-04-11"  # 5 rodadas + 1 semana
+
+
+async def test_whatsapp_obrigatorio_e_convite_do_grupo(client, sent, monkeypatch):
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "WHATSAPP_GROUP_LINK", "https://chat.whatsapp.com/abc")
+    monkeypatch.setattr(settings, "FRONTEND_URL", "https://duviscup.com.br")
+    c = client
+    adm = await login(c, "admin@liga.com")
+    tok = (await c.post(f"{API}/admin/invites", json={"max_uses": 5}, headers=adm)).json()["token"]
+    base = {"invite_token": tok, "password": "segredo", "name": "Zé Teste"}
+    r = await c.post(f"{API}/auth/register", json={**base, "email": "z1@x.com"})
+    assert r.status_code == 422  # sem WhatsApp
+    r = await c.post(f"{API}/auth/register", json={**base, "email": "z1@x.com", "phone": "1234-5678"})
+    assert r.status_code == 400 and "WhatsApp inválido" in r.json()["detail"]
+    r = await c.post(f"{API}/auth/register", json={**base, "email": "z1@x.com", "phone": "(92) 99123-4567"})
+    assert r.status_code == 201 and r.json()["user"]["phone"] == "5592991234567"
+    uid = r.json()["user"]["id"]
+
+    sent.clear()
+    await c.post(f"{API}/admin/users/{uid}/approve", json={}, headers=adm)
+    dm = [m for m in sent if m.startswith("[para 5592991234567]")]
+    assert len(dm) == 1 and "https://chat.whatsapp.com/abc" in dm[0] and "https://duviscup.com.br" in dm[0]
+    assert any("entrou para a liga" in m and not m.startswith("[para") for m in sent)
+
+    sent.clear()
+    r = await c.post(f"{API}/admin/users/{uid}/group-invite", headers=adm)
+    assert r.status_code == 200 and sent and sent[0].startswith("[para 5592991234567]")
+
+
+def test_normalizacao_de_telefone():
+    import pytest
+    from app.domain.phone import PhoneError, normalize_phone
+    assert normalize_phone("(92) 99123-4567") == "5592991234567"
+    assert normalize_phone("+55 92 3234-5678") == "559232345678"
+    assert normalize_phone("0055 11 98888-7777") == "5511988887777"
+    assert normalize_phone("+1 415 555 0100") == "14155550100"
+    assert normalize_phone("  ") is None
+    for bad in ("1234-5678", "55 9", "abc"):
+        with pytest.raises(PhoneError):
+            normalize_phone(bad)

@@ -7,7 +7,7 @@ import { api, errorMessage } from '@/lib/api'
 import { useMe } from '@/lib/auth'
 import type { User } from '@/lib/types'
 import { useCategory } from '@/lib/useCategory'
-import { fmtDate } from '@/lib/utils'
+import { fmtDate, fmtPhone } from '@/lib/utils'
 
 const STATUS: Record<User['status'], [string, 'warn' | 'good' | 'bad' | 'neutral']> = {
   pending: ['pendente', 'warn'], approved: ['aprovado', 'good'], rejected: ['recusado', 'bad'], removed: ['removido', 'neutral'],
@@ -33,6 +33,14 @@ export function MembersTab() {
     onError: (e) => alert(errorMessage(e)),
   })
 
+  async function groupInvite(u: User) {
+    if (!confirm(`Enviar o convite do grupo da liga para o WhatsApp de ${u.display_name}?`)) return
+    try {
+      const r = await api.admin.sendGroupInvite(u.id)
+      alert(`Convite do grupo enviado para ${fmtPhone(r.phone)}.`)
+    } catch (e) { alert(errorMessage(e)) }
+  }
+
   if (users.isLoading) return <Spinner />
   const list = users.data ?? []
   const pending = list.filter((u) => u.status === 'pending')
@@ -57,7 +65,8 @@ export function MembersTab() {
             <Card key={u.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
               <div>
                 <div className="font-medium">{u.name}{u.nickname && <span className="text-muted-foreground"> “{u.nickname}”</span>}</div>
-                <div className="text-xs text-muted-foreground">{u.email}{u.phone && ` · ${u.phone}`} · {fmtDate(u.created_at)}</div>
+                <div className="text-xs text-muted-foreground">{u.email} · {u.phone ? fmtPhone(u.phone) : <Badge tone="warn">sem WhatsApp</Badge>} · {fmtDate(u.created_at)}</div>
+                {u.phone && <div className="mt-1 text-xs text-muted-foreground">Ao aprovar, ele recebe no WhatsApp o convite do grupo da liga.</div>}
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 {regCats.length > 0 && (
@@ -89,7 +98,7 @@ export function MembersTab() {
                     <div className="font-medium">{u.display_name}</div>
                     {u.nickname && <div className="text-xs text-muted-foreground">{u.name}</div>}
                   </td>
-                  <td className="px-3 text-xs">{u.email}<br />{u.phone}</td>
+                  <td className="px-3 text-xs">{u.email}<br />{u.phone ? fmtPhone(u.phone) : <Badge tone="warn">sem WhatsApp</Badge>}</td>
                   <td className="px-3">
                     <Select className="h-8 w-auto" value={u.role} disabled={u.id === me.data?.id}
                       onChange={(e) => run.mutate(() => api.admin.patchUser(u.id, { role: e.target.value as User['role'] }))}>
@@ -98,6 +107,9 @@ export function MembersTab() {
                     </Select>
                   </td>
                   <td className="px-3 text-right">
+                    {u.phone && (
+                      <Button size="sm" variant="ghost" className="text-xs" onClick={() => groupInvite(u)}>Convite do grupo</Button>
+                    )}
                     <Button size="sm" variant="ghost" className="text-xs" onClick={() => {
                       const n = prompt('Apelido (vazio remove):', u.nickname ?? '')
                       if (n !== null) run.mutate(() => api.admin.patchUser(u.id, { nickname: n }))

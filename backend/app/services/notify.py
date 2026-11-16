@@ -10,12 +10,15 @@ from app.core.config import settings
 log = logging.getLogger("liga.notify")
 
 
-async def send(text: str) -> bool:
+async def send(text: str, number: str | None = None) -> bool:
+    """Envia para o grupo (padrão) ou, com `number`, em privado para um jogador."""
     if not (settings.NOTIFY_URL and settings.NOTIFY_TOKEN):
-        log.info("[notify desativado] %s", text)
+        log.info("[notify desativado] %s%s", f"(para {number}) " if number else "", text)
         return False
     body = {"text": text, "source": "liga-tenis"}
-    if settings.NOTIFY_TARGET:
+    if number:
+        body["number"] = number
+    elif settings.NOTIFY_TARGET:
         body["number"] = settings.NOTIFY_TARGET
     try:
         async with httpx.AsyncClient(timeout=15) as client:
@@ -37,15 +40,16 @@ class Outbox:
     """Acumula avisos durante a requisição; enviados depois da resposta."""
 
     def __init__(self) -> None:
-        self.messages: list[str] = []
+        self.messages: list[tuple[str, str | None]] = []
 
-    def add(self, text: str | None) -> None:
+    def add(self, text: str | None, number: str | None = None) -> None:
+        """Sem `number`: aviso no grupo. Com `number`: mensagem privada."""
         if text:
-            self.messages.append(text)
+            self.messages.append((text, number))
 
     async def flush(self) -> None:
-        for m in self.messages:
-            await send(m)
+        for text, number in self.messages:
+            await send(text, number)
 
 
 def get_outbox(bg: BackgroundTasks) -> Outbox:

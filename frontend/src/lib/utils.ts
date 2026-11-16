@@ -26,6 +26,13 @@ export function fmtDateTime(d: string | null | undefined) {
   })
 }
 
+/** '5592991234567' -> '(92) 99123-4567'; outros formatos ficam como +código. */
+export function fmtPhone(p: string | null | undefined) {
+  if (!p) return ''
+  const m = p.match(/^55(\d{2})(\d{4,5})(\d{4})$/)
+  return m ? `(${m[1]}) ${m[2]}-${m[3]}` : `+${p}`
+}
+
 export const today = () => new Date().toISOString().slice(0, 10)
 
 export const MATCH_STATUS: Record<MatchStatus, string> = {

@@ -58,7 +58,7 @@ export const api = {
     get<{ valid: boolean; note: string | null; reason: string | null }>(`/auth/invite/${token}`),
   register: (body: {
     invite_token: string; email: string; password: string; name: string
-    nickname?: string; phone?: string
+    nickname?: string; phone: string
   }) => post<TokenOut>('/auth/register', body),
   me: () => get<User>('/auth/me'),
   updateMe: (body: Partial<{ name: string; nickname: string; phone: string; password: string }>) =>
@@ -86,6 +86,7 @@ export const api = {
     approve: (id: string, category_id?: string | null) =>
       post<User>(`/admin/users/${id}/approve`, { category_id: category_id || null }),
     reject: (id: string) => post<User>(`/admin/users/${id}/reject`),
+    sendGroupInvite: (id: string) => post<{ sent: boolean; phone: string }>(`/admin/users/${id}/group-invite`),
     patchUser: (id: string, body: { nickname?: string | null; role?: 'admin' | 'player' }) =>
       patch<User>(`/admin/users/${id}`, body),
     deleteUser: (id: string) =>

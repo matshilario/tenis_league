@@ -69,7 +69,8 @@ Testes: `cd backend && .venv/bin/pytest`.
 | `DATABASE_URL` | Postgres (aceita o `postgres://` da Railway) |
 | `SECRET_KEY` | chave dos tokens — gere uma longa e aleatória |
 | `CORS_ORIGINS`, `FRONTEND_URL` | URL do frontend (CORS e links de convite) |
-| `NOTIFY_URL`, `NOTIFY_TOKEN`, `NOTIFY_TARGET` | avisos no WhatsApp; `NOTIFY_TARGET` = JID do grupo (`…@g.us`). Vazio = só log |
+| `NOTIFY_URL`, `NOTIFY_TOKEN`, `NOTIFY_TARGET` | avisos no WhatsApp; `NOTIFY_TARGET` = JID do grupo (`…@g.us`). Vazio = só log. O token precisa estar em `OPEN_TOKENS` do notify (envia em privado) |
+| `WHATSAPP_GROUP_LINK` | link de convite do grupo, mandado em privado a cada jogador aprovado |
 
 Frontend: `NEXT_PUBLIC_API_URL` (URL pública do backend, definida no build).
 

@@ -59,3 +59,11 @@ def champion(category: str, name: str) -> str:
 
 def member_approved(name: str) -> str:
     return f"👋 {name} entrou para a liga. Bem-vindo(a)!"
+
+
+def group_invite(name: str, group_link: str, app_url: str) -> str:
+    """Mensagem privada para quem acabou de ser aprovado."""
+    return (f"🎾 Oi, {name}! Sua entrada na Duvis Cup foi aprovada.\n\n"
+            f"Entra no grupo da liga (avisos, resultados e as zoeiras):\n{group_link}\n\n"
+            f"O app da liga: {app_url}\n"
+            "Cuidado com os macacos. 🐒")

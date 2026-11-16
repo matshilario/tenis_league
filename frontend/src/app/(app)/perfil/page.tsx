@@ -37,7 +37,9 @@ export default function ProfilePage() {
       <form onSubmit={save} className="space-y-3">
         <Field label="Nome"><Input required minLength={2} value={f.name} onChange={set('name')} /></Field>
         <Field label="Apelido"><Input value={f.nickname} onChange={set('nickname')} maxLength={60} /></Field>
-        <Field label="WhatsApp"><Input type="tel" value={f.phone} onChange={set('phone')} /></Field>
+        <Field label="WhatsApp" hint="Com DDD. É por aqui que chegam os convites e avisos da liga.">
+          <Input type="tel" inputMode="tel" placeholder="(92) 99999-9999" value={f.phone} onChange={set('phone')} />
+        </Field>
         <Field label="Nova senha" hint="Deixe em branco para manter.">
           <Input type="password" minLength={6} autoComplete="new-password" value={f.password} onChange={set('password')} />
         </Field>

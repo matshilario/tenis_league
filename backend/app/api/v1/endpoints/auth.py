@@ -3,6 +3,7 @@ from sqlalchemy import func, select
 
 from app.api.deps import DB, AnyUser
 from app.core.security import create_access_token, get_password_hash, verify_password
+from app.domain.phone import PhoneError, normalize_phone
 from app.models import Invite, User, UserStatus, aware, utcnow
 from app.schemas import InviteCheck, LoginIn, ProfileIn, RegisterIn, TokenOut, UserOut
 
@@ -39,13 +40,19 @@ async def register(body: RegisterIn, db: DB):
     problem = invite_problem(inv)
     if problem:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, problem)
+    try:
+        phone = normalize_phone(body.phone)
+    except PhoneError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    if not phone:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Informe seu WhatsApp.")
     email = body.email.lower().strip()
     exists = await db.execute(select(User).where(func.lower(User.email) == email))
     if exists.scalars().first():
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Este e-mail já tem cadastro.")
     user = User(email=email, hashed_password=get_password_hash(body.password),
                 name=body.name.strip(), nickname=(body.nickname or "").strip() or None,
-                phone=body.phone, invite_id=inv.id, status=UserStatus.PENDING)
+                phone=phone, invite_id=inv.id, status=UserStatus.PENDING)
     inv.uses += 1
     db.add(user)
     await db.flush()
@@ -73,6 +80,11 @@ async def me(user: AnyUser):
 @router.patch("/me", response_model=UserOut)
 async def update_me(body: ProfileIn, user: AnyUser, db: DB):
     data = body.model_dump(exclude_unset=True)
+    if "phone" in data:
+        try:
+            data["phone"] = normalize_phone(data["phone"])
+        except PhoneError as exc:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
     if "password" in data:
         pw = data.pop("password")
         if pw:

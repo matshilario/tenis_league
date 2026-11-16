@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     NOTIFY_URL: str = ""
     NOTIFY_TOKEN: str = ""
     NOTIFY_TARGET: str = ""  # JID do grupo (…@g.us) ou número
+    # Link de convite do grupo da liga, enviado em privado a cada jogador aprovado
+    WHATSAPP_GROUP_LINK: str = ""
 
     @property
     def database_url(self) -> str:

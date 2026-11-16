@@ -235,7 +235,9 @@ const NIGHT_COLORS: Colors = {
   shadow: 'rgba(0,0,0,0.38)',
 }
 
-export const MONKEY_COOLDOWN = 35 // segundos entre aparições do macaco
+export const MONKEY_COOLDOWN = 25 // segundos entre aparições do macaco
+/** A primeira aparição do macaco na página é sempre esta cena (a favorita da turma). */
+export const FIRST_MONKEY_SCENE = 'monkey-poop'
 
 export class CourtEngine {
   geo!: Geo
@@ -249,6 +251,8 @@ export class CourtEngine {
   lastMonkeyAt = -1e9
   time = 0
   monkeyBusy = false
+  /** já houve alguma aparição do macaco nesta página? */
+  monkeySeen = false
 
   private ctx: CanvasRenderingContext2D
   private buf: HTMLCanvasElement
@@ -451,6 +455,10 @@ export class CourtEngine {
   }
 
   private pick(track: 'main' | 'ambient'): Script {
+    if (track === 'main' && !this.monkeySeen && this.monkeyReady()) {
+      const first = this.scenes.find((s) => s.id === FIRST_MONKEY_SCENE && (!s.when || s.when(this)))
+      if (first) return this.wrap(first)
+    }
     const pool = this.scenes.filter((s) => s.track === track &&
       (!s.monkey || this.monkeyReady()) && (!s.when || s.when(this)))
     const total = pool.reduce((a, s) => a + s.weight, 0)
@@ -463,14 +471,20 @@ export class CourtEngine {
   }
 
   private pickAmbient(): Script | null {
-    if (!this.monkeyReady() || Math.random() > 0.002) return null // sorteio a cada quadro
+    // as cenas de fundo nunca são a primeira aparição e ficam raras (~1 a cada 40 s
+    // depois de liberado), para não tirarem a vez das cenas principais do macaco
+    if (!this.monkeySeen || !this.monkeyReady() || Math.random() > 0.0004) return null
     const pool = this.scenes.filter((s) => s.track === 'ambient' && (!s.when || s.when(this)))
     if (!pool.length) return null
     return this.wrap(pool[Math.floor(Math.random() * pool.length)])
   }
 
   private *wrap(s: SceneDef): Script {
-    if (s.monkey || s.track === 'ambient') { this.monkeyBusy = true; this.lastMonkeyAt = this.time }
+    if (s.monkey || s.track === 'ambient') {
+      this.monkeyBusy = true
+      this.monkeySeen = true
+      this.lastMonkeyAt = this.time
+    }
     try {
       yield* s.run(this)
     } finally {

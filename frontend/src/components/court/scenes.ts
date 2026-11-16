@@ -242,8 +242,8 @@ function* monkeyPoop(e: CourtEngine): Script {
 export const SCENES: SceneDef[] = [
   { id: 'rally', track: 'main', weight: 5, run: rally },
   { id: 'serve', track: 'main', weight: 2, run: serveAndRally },
-  { id: 'monkey-ball', track: 'main', weight: 4, monkey: true, run: monkeyStealsBall },
-  { id: 'monkey-poop', track: 'main', weight: 3, monkey: true, run: monkeyPoop },
+  { id: 'monkey-ball', track: 'main', weight: 3, monkey: true, run: monkeyStealsBall },
+  { id: 'monkey-poop', track: 'main', weight: 8, monkey: true, run: monkeyPoop },
   { id: 'monkey-watch', track: 'ambient', weight: 1, run: monkeyWatches },
   { id: 'monkey-bottle', track: 'ambient', weight: 1, when: (e) => !!e.geo.bench && e.bottleOnBench, run: monkeyBottle },
 ]

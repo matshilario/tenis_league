@@ -12,7 +12,9 @@ from app.services.notify import Outbox, get_outbox
 
 bearer = HTTPBearer(auto_error=False)
 
-DB = Annotated[AsyncSession, Depends(get_db)]
+# scope="function": o commit (código depois do yield em get_db) roda ANTES da resposta
+# sair. Com o padrão ("request"), o cliente podia recarregar e ler o estado antigo.
+DB = Annotated[AsyncSession, Depends(get_db, scope="function")]
 OutboxDep = Annotated[Outbox, Depends(get_outbox)]
 
 

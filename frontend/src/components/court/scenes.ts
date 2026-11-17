@@ -3,6 +3,7 @@
  *
  * Trilha "main": tenista e bola (uma cena por vez).
  * Trilha "ambient": aparições do macaco-prego que não mexem na bola.
+ * Trilha "side": personagens da turma ao lado da quadra, de tempos em tempos.
  * Cenas com `monkey: true` respeitam o intervalo mínimo entre aparições do macaco.
  *
  * Para criar uma cena: escreva um gerador que comanda e.player / e.ball / e.monkey e
@@ -10,7 +11,7 @@
  * registre em SCENES com um peso.
  */
 
-import { clamp, lerp, rand, singlesAt, type CourtEngine, type SceneDef, type Script, type Vec } from './engine'
+import { clamp, hwAt, lerp, rand, singlesAt, type CourtEngine, type SceneDef, type Script, type Vec } from './engine'
 
 const CONTACT_Z = 9
 
@@ -240,11 +241,119 @@ function* monkeyPoop(e: CourtEngine): Script {
   yield 1
 }
 
+/**
+ * Turma — cãibra: o organizador chega pelo lado da quadra, sente a fisgada, cai de
+ * costas e fica com a perna esticada para o alto (tremendo), puxa o pé para alongar
+ * e sai mancando.
+ */
+function* cramp(e: CourtEngine): Script {
+  const g = e.geo
+  const bd = e.buddy
+  const fromRight = Math.random() < 0.5
+  const edge = fromRight ? g.W + 12 : -12
+  // no barro ao lado da quadra, na altura do meio (longe do botão e da borda de baixo)
+  const y = Math.round(rand(27, 32))
+  const hw = hwAt(g, y)
+  const outside = hw + Math.max(12, (g.W / 2 - hw) * 0.5)
+  const spot = clamp(g.cx + (fromRight ? 1 : -1) * outside, 14, g.W - 14)
+  bd.enter(edge, y)
+  bd.moveTo(spot, 26)
+  yield () => bd.arrived
+
+  // fisgada: segura a perna e pula num pé só
+  yield 0.4
+  for (let i = 0; i < 3; i++) {
+    bd.forced = 'buddyGrab'
+    yield 0.22
+    bd.forced = 'buddyWalkB'
+    yield 0.12
+  }
+  bd.forced = 'buddyGrab'
+  e.say('AAAI! CÃIBRA!', 2.4, 'buddy')
+  yield 0.7
+
+  // cai sentado e deita de costas, perna para o alto
+  bd.forced = 'buddySit'
+  yield 0.35
+  const tremble = e.time + rand(3, 4)
+  while (e.time < tremble) {
+    bd.forced = bd.forced === 'buddyLieA' ? 'buddyLieB' : 'buddyLieA'
+    yield rand(0.12, 0.3)
+  }
+
+  // alonga puxando a ponta do pé
+  e.say('AI AI AI...', 1.6, 'buddy')
+  for (let i = 0; i < 3; i++) {
+    bd.forced = 'buddyLieC'
+    yield 0.9
+    bd.forced = 'buddyLieA'
+    yield 0.35
+  }
+  yield 0.6
+
+  // levanta e sai mancando
+  bd.forced = 'buddySit'
+  yield 0.8
+  bd.forced = null
+  bd.limp = true
+  bd.moveTo(edge, 22)
+  yield () => bd.arrived
+}
+
+/**
+ * Turma — André fumando na beira da quadra: chega, fica de olho no jogo, dá umas
+ * tragadas (brasa acesa), solta a baforada e o cigarro vai soltando um fiapo de fumaça.
+ */
+function* andreSmokes(e: CourtEngine): Script {
+  const g = e.geo
+  const bd = e.buddy
+  const fromRight = Math.random() < 0.5
+  const edge = fromRight ? g.W + 12 : -12
+  const y = Math.round(rand(20, 27))
+  const hw = hwAt(g, y)
+  const outside = hw + Math.max(10, (g.W / 2 - hw) * 0.5)
+  const spot = clamp(g.cx + (fromRight ? 1 : -1) * outside, 10, g.W - 10)
+  bd.enter(edge, y, 'andre')
+  bd.moveTo(spot, 20)
+  yield () => bd.arrived
+  bd.flip = fromRight // de frente para a quadra
+
+  const until = e.time + rand(16, 22)
+  while (e.time < until) {
+    // tragada
+    bd.forced = 'andreSmoke'
+    yield 1.2
+    bd.forced = 'andreStand'
+    yield 0.5
+    // baforada
+    bd.forced = 'andreExhale'
+    for (let i = 0; i < 4; i++) {
+      const m = bd.at(14, 5)
+      e.puff(m.x, m.y, true)
+      yield 0.16
+    }
+    yield 0.6
+    bd.forced = 'andreStand'
+    // espera olhando o jogo; o cigarro solta um fiapo
+    const wait = e.time + rand(2.5, 4.5)
+    while (e.time < wait) {
+      const tip = bd.at(15, 14)
+      e.puff(tip.x, tip.y - 1, false)
+      yield 0.4
+    }
+  }
+  bd.forced = null
+  bd.moveTo(edge, 20)
+  yield () => bd.arrived
+}
+
 export const SCENES: SceneDef[] = [
   { id: 'rally', track: 'main', weight: 5, run: rally },
   { id: 'serve', track: 'main', weight: 2, run: serveAndRally },
   { id: 'monkey-ball', track: 'main', weight: 3, monkey: true, run: monkeyStealsBall },
   { id: 'monkey-poop', track: 'main', weight: 10, monkey: true, run: monkeyPoop },
   { id: 'monkey-watch', track: 'ambient', weight: 1, run: monkeyWatches },
+  { id: 'caimbra', track: 'side', weight: 1, run: cramp },
+  { id: 'andre', track: 'side', weight: 1, run: andreSmokes },
   { id: 'monkey-bottle', track: 'ambient', weight: 1, when: (e) => !!e.geo.bench && e.bottleOnBench, run: monkeyBottle },
 ]

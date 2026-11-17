@@ -94,8 +94,6 @@ export class Player {
   x = 0
   /** até quando aparece a mancha de cocô na cabeça (tempo do motor) */
   splatUntil = 0
-  /** fala em balão: texto e intervalo de tempo (relógio do motor) */
-  speech: { text: string; from: number; until: number } | null = null
   y = PLAYER_Y
   flip = false
   private target: number | null = null
@@ -183,6 +181,73 @@ export class Monkey {
   }
 }
 
+/**
+ * Personagem da turma que aparece ao lado da quadra (fora do jogo). Anda de perfil;
+ * nas cenas, `forced` fixa uma pose (caído, deitado…).
+ */
+export type BuddyKind = 'org' | 'andre'
+
+const BUDDY_FRAMES: Record<BuddyKind, { stand: SpriteName; walk: [SpriteName, SpriteName] }> = {
+  org: { stand: 'buddyWalkB', walk: ['buddyWalkA', 'buddyWalkB'] },
+  andre: { stand: 'andreStand', walk: ['andreWalkA', 'andreWalkB'] },
+}
+
+export class Buddy {
+  kind: BuddyKind = 'org'
+  x = -20
+  y = 49
+  visible = false
+  flip = false
+  forced: SpriteName | null = null
+  /** mancando: passo curto e passo arrastado */
+  limp = false
+  private target: number | null = null
+  private speed = 30
+  private animT = 0
+
+  enter(x: number, y: number, kind: BuddyKind = 'org') {
+    this.kind = kind
+    this.x = x; this.y = y; this.visible = true; this.forced = null; this.limp = false
+  }
+  moveTo(x: number, speed = 30) { this.target = x; this.speed = speed }
+  get arrived() { return this.target === null }
+  leave() { this.visible = false; this.target = null; this.forced = null; this.limp = false }
+
+  update(dt: number) {
+    this.animT += dt
+    if (this.target === null) return
+    const d = this.target - this.x
+    // mancando: anda só no passo "bom"
+    const slow = this.limp && this.animT % 0.5 > 0.3 ? 0.25 : 1
+    const step = this.speed * slow * dt
+    if (Math.abs(d) <= step) { this.x = this.target; this.target = null }
+    else { this.x += Math.sign(d) * step; this.flip = d < 0 }
+  }
+
+  sprite(): SpriteName {
+    if (this.forced) return this.forced
+    const fr = BUDDY_FRAMES[this.kind]
+    if (this.target === null) return fr.stand
+    if (this.limp) return this.animT % 0.5 > 0.3 ? 'buddyGrab' : 'buddyWalkB'
+    return fr.walk[Math.floor(this.animT / 0.16) % 2]
+  }
+
+  /** Topo da cabeça (coordenadas do mundo), para o balão de fala. */
+  head(): { x: number; y: number } {
+    const f = this.flip ? -1 : 1
+    const s = this.sprite()
+    if (s.startsWith('buddyLie')) return { x: this.x - f * 10, y: this.y - 4 }
+    if (s === 'buddySit') return { x: this.x - f * 1, y: this.y - 13 }
+    return { x: this.x + f, y: this.y - 18 }
+  }
+
+  /** Ponto do sprite (coluna/linha da grade, âncora 8,19) em coordenadas do mundo. */
+  at(col: number, row: number): { x: number; y: number } {
+    const f = this.flip ? -1 : 1
+    return { x: this.x + f * (col - 8), y: this.y + row - 19 }
+  }
+}
+
 // ---------------------------------------------------------------- roteirização
 export type Wait = number | (() => boolean)
 export type Script = Generator<Wait, void, unknown>
@@ -207,7 +272,8 @@ class Track {
 
 export interface SceneDef {
   id: string
-  track: 'main' | 'ambient'
+  /** main: tenista e bola · ambient: macaco de fundo · side: turma ao lado da quadra */
+  track: 'main' | 'ambient' | 'side'
   weight: number
   /** Cenas com macaco compartilham um intervalo mínimo entre aparições. */
   monkey?: boolean
@@ -236,6 +302,8 @@ const NIGHT_COLORS: Colors = {
 }
 
 export const MONKEY_COOLDOWN = 25 // segundos entre aparições do macaco
+/** Intervalo (s) entre as cenas da turma ao lado da quadra. */
+export const SIDE_GAP: [number, number] = [45, 80]
 /** A primeira aparição do macaco na página é sempre esta cena (a favorita da turma). */
 export const FIRST_MONKEY_SCENE = 'monkey-poop'
 
@@ -246,6 +314,12 @@ export class CourtEngine {
   poop = new Ball()
   player = new Player()
   monkey = new Monkey()
+  buddy = new Buddy()
+  /** balão de fala ativo (tenista ou personagem da turma) */
+  speech: { text: string; from: number; until: number; who: 'player' | 'buddy' } | null = null
+  sideBusy = false
+  /** partículas de fumaça (x, y já na tela de arte, sem a área de overflow) */
+  private puffs: { x: number; y: number; vx: number; vy: number; age: number; life: number; big: boolean }[] = []
   bottleOnBench = true
   bottleBackAt = 0
   lastMonkeyAt = -1e9
@@ -263,6 +337,9 @@ export class CourtEngine {
   private colors: Colors = DAY_COLORS
   private main = new Track()
   private ambient = new Track()
+  private side = new Track()
+  private nextSideAt = rand(30, 40)
+  private sideGap = SIDE_GAP
   private scale = 2
   private dpr = 1
   private font = 'monospace'
@@ -291,6 +368,13 @@ export class CourtEngine {
       if (only) this.firstMonkeyAt = -1 // cena forçada já no primeiro sorteio
       if (only) this.scenes = scenes.filter((sc) => sc.id === only).map((sc) => ({ ...sc, weight: 1000 }))
         .concat(scenes.filter((sc) => sc.track === 'main' && !sc.monkey))
+    }
+    // ?turma (ou ?turma=<id da cena>): personagens da turma aparecem logo e repetem
+    if (q.has('turma')) {
+      this.nextSideAt = 2
+      this.sideGap = [6, 8]
+      const only = q.get('turma')
+      if (only) this.scenes = this.scenes.filter((sc) => sc.track !== 'side' || sc.id === only)
     }
   }
 
@@ -427,6 +511,9 @@ export class CourtEngine {
     this.ball.update(dt)
     this.player.update(dt)
     this.monkey.update(dt)
+    this.buddy.update(dt)
+    for (const p of this.puffs) { p.age += dt; p.x += p.vx * dt; p.y += p.vy * dt }
+    this.puffs = this.puffs.filter((p) => p.age < p.life)
     this.poop.update(dt)
     if (this.monkey.carrying === 'poop') {
       const throwing = this.monkey.forced === 'monkeyThrow'
@@ -445,8 +532,37 @@ export class CourtEngine {
       const s = this.pickAmbient()
       if (s) this.ambient.run(s)
     }
+    if (this.side.idle && !this.sideBusy && !this.monkeyBusy && this.time > this.nextSideAt) {
+      const pool = this.scenes.filter((s) => s.track === 'side' && (!s.when || s.when(this)))
+      if (pool.length) this.side.run(this.wrapSide(pool[Math.floor(Math.random() * pool.length)]))
+      else this.nextSideAt = Infinity
+    }
     this.main.step(dt)
     this.ambient.step(dt)
+    this.side.step(dt)
+  }
+
+  /** Fumaça: baforada (big) ou fiapo do cigarro. */
+  puff(x: number, y: number, big: boolean) {
+    const away = this.buddy.flip ? -1 : 1
+    this.puffs.push({
+      x, y, big, age: 0,
+      vx: big ? away * rand(5, 9) : rand(-1.5, 1.5),
+      vy: big ? -rand(3, 6) : -rand(5, 8),
+      life: big ? rand(1.4, 2) : rand(1.6, 2.4),
+    })
+  }
+
+  private *wrapSide(s: SceneDef): Script {
+    this.sideBusy = true
+    try {
+      yield* s.run(this)
+    } finally {
+      this.sideBusy = false
+      this.buddy.leave()
+      this.puffs = []
+      this.nextSideAt = this.time + rand(this.sideGap[0], this.sideGap[1])
+    }
   }
 
   monkeyReady() {
@@ -540,8 +656,33 @@ export class CourtEngine {
       })
     }
 
+    // personagem da turma
+    if (this.buddy.visible) {
+      const bd = this.buddy
+      items.push({
+        y: bd.y,
+        draw: () => {
+          const name = bd.sprite()
+          const wide = name.startsWith('buddyLie') || name === 'buddySit'
+          b.fillStyle = this.colors.shadow
+          b.fillRect(Math.round(bd.x) - (wide ? 12 : 5), O + Math.round(bd.y), wide ? 24 : 11, 1)
+          this.blit(b, name, bd.x, O + bd.y, bd.flip)
+        },
+      })
+    }
+
     items.sort((a, c) => a.y - c.y)
     for (const it of items) it.draw()
+
+    // fumaça por cima dos personagens
+    for (const p of this.puffs) {
+      const k = p.age / p.life
+      const size = p.big ? (k < 0.3 ? 2 : 3) : k < 0.5 ? 1 : 2
+      b.globalAlpha = 0.85 * (1 - k)
+      b.fillStyle = this.pal === NIGHT ? '#bdb8ad' : '#ece8de'
+      b.fillRect(Math.round(p.x - size / 2), O + Math.round(p.y - size / 2), size, size)
+    }
+    b.globalAlpha = 1
 
     // bola por último: passa por cima da rede e do resto
     if (this.ball.visible) {
@@ -573,16 +714,16 @@ export class CourtEngine {
     this.drawSpeech(ctx)
   }
 
-  /** O tenista fala por alguns segundos (balão acima da cabeça). */
-  say(text: string, secs = 1.8) {
-    this.player.speech = { text, from: this.time, until: this.time + secs }
+  /** Alguém fala por alguns segundos (balão acima da cabeça). */
+  say(text: string, secs = 1.8, who: 'player' | 'buddy' = 'player') {
+    this.speech = { text, from: this.time, until: this.time + secs, who }
   }
 
   /** Balão de fala em pixel art, desenhado já na resolução da tela (texto nítido). */
   private drawSpeech(ctx: CanvasRenderingContext2D) {
-    const sp = this.player.speech
+    const sp = this.speech
     if (!sp) return
-    if (this.time > sp.until) { this.player.speech = null; return }
+    if (this.time > sp.until) { this.speech = null; return }
     const u = this.scale * this.dpr // 1 pixel de arte em pixels do canvas
     const t = this.time - sp.from
     const pop = t < 0.06 ? 0.6 : t < 0.12 ? 0.85 : 1 // entrada em degraus, bem "8-bit"
@@ -595,8 +736,9 @@ export class CourtEngine {
     const padY = Math.round(2.5 * u * pop)
     const w = tw + padX * 2
     const h = size + padY * 2
-    const headX = this.player.x * u
-    const headY = (OVERFLOW + this.player.y - 21) * u
+    const head = sp.who === 'buddy' ? this.buddy.head() : { x: this.player.x, y: this.player.y - 21 }
+    const headX = head.x * u
+    const headY = (OVERFLOW + head.y) * u
     // tremidinha nos primeiros instantes: grito!
     const shake = t < 0.5 ? Math.round(Math.sin(t * 60) * u * 0.6) : 0
     let x = Math.round(headX - w / 2) + shake

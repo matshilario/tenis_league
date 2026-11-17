@@ -1,9 +1,14 @@
 import axios, { AxiosError } from 'axios'
 import type {
-  AuditEntry, CategoryDetail, Entry, Invite, Match, PublicUser, ResultType, Score, Season, User,
+  AuditEntry, CategoryDetail, Entry, Invite, Match, PublicSponsor, PublicUser, ResultType, Score,
+  Season, Sponsor, SponsorForm, SponsorPage, Sponsorship, SponsorStatus, Tier, User,
 } from './types'
 
-const BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000') + '/api/v1'
+export const API_ORIGIN = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const BASE = API_ORIGIN + '/api/v1'
+
+/** URL absoluta de um caminho devolvido pela API (ex.: logo do patrocinador). */
+export const apiUrl = (path: string | null | undefined) => (path ? API_ORIGIN + path : null)
 const TOKEN_KEY = 'liga.token'
 
 export const tokenStore = {
@@ -25,8 +30,8 @@ http.interceptors.response.use(
   (err: AxiosError) => {
     if (err.response?.status === 401 && typeof window !== 'undefined') {
       tokenStore.clear()
-      if (!window.location.pathname.startsWith('/login') &&
-          !window.location.pathname.startsWith('/convite')) {
+      const p = window.location.pathname
+      if (!['/login', '/convite', '/patrocine', '/compartilhar'].some((x) => p.startsWith(x))) {
         window.location.href = '/login'
       }
     }
@@ -75,8 +80,33 @@ export const api = {
   confirm: (id: string) => post<Match>(`/matches/${id}/confirm`),
   contest: (id: string, reason: string) => post<Match>(`/matches/${id}/contest`, { reason }),
 
+  // público (sem login)
+  sponsorPage: (slug: string) => get<SponsorPage>(`/public/sponsor/${slug}`),
+  sponsorSubmit: (slug: string, body: SponsorForm) =>
+    post<{ id: string; payment: string | null }>(`/public/sponsor/${slug}`, body),
+  activeSponsors: () => get<PublicSponsor[]>('/public/sponsors/active'),
+
   // admin
   admin: {
+    sponsorship: (seasonId: string) => get<Sponsorship>(`/admin/seasons/${seasonId}/sponsorship`),
+    setSponsorship: (seasonId: string, body: { open?: boolean; pitch?: string; payment?: string }) =>
+      patch<Sponsorship>(`/admin/seasons/${seasonId}/sponsorship`, body),
+    newSponsorLink: (seasonId: string) =>
+      post<Sponsorship>(`/admin/seasons/${seasonId}/sponsorship/new-link`),
+    addTier: (seasonId: string, body: Omit<Tier, 'id' | 'taken' | 'available'>) =>
+      post<Tier>(`/admin/seasons/${seasonId}/tiers`, body),
+    patchTier: (id: string, body: Partial<Omit<Tier, 'id' | 'taken' | 'available'>> & { unlimited?: boolean }) =>
+      patch<Tier>(`/admin/tiers/${id}`, body),
+    deleteTier: (id: string) => del(`/admin/tiers/${id}`),
+    sponsors: (seasonId: string) => get<Sponsor[]>(`/admin/seasons/${seasonId}/sponsors`),
+    addSponsor: (seasonId: string, body: SponsorForm) =>
+      post<Sponsor>(`/admin/seasons/${seasonId}/sponsors`, body),
+    patchSponsor: (id: string, body: Partial<{
+      status: SponsorStatus; tier_id: string; visible_until: string | null
+      company: string; website: string; instagram: string; logo: string
+    }>) => patch<Sponsor>(`/admin/sponsors/${id}`, body),
+    deleteSponsor: (id: string) => del(`/admin/sponsors/${id}`),
+
     invites: () => get<Invite[]>('/admin/invites'),
     createInvite: (body: { note?: string; max_uses?: number; expires_in_days?: number | null }) =>
       post<Invite>('/admin/invites', body),

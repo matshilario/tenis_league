@@ -134,3 +134,97 @@ export interface AuditEntry {
   created_at: string
   actor_id: string | null
 }
+
+// ------------------------------------------------------------------ patrocínio
+export interface Tier {
+  id: string
+  name: string
+  tagline: string | null
+  price_cents: number
+  slots: number | null
+  visibility_days: number
+  perks: string[] | null
+  weight: number
+  sort: number
+  taken: number
+  available: boolean
+}
+
+export interface Sponsorship {
+  season_id: string
+  season_name: string
+  open: boolean
+  slug: string | null
+  url: string | null
+  pitch: string | null
+  payment: string | null
+  tiers: Tier[]
+}
+
+export type SponsorStatus = 'pending' | 'approved' | 'rejected'
+
+export interface Sponsor {
+  id: string
+  season_id: string
+  tier_id: string | null
+  tier_name: string | null
+  company: string
+  contact_name: string
+  phone: string | null
+  email: string | null
+  website: string | null
+  instagram: string | null
+  message: string | null
+  status: SponsorStatus
+  approved_at: string | null
+  visible_until: string | null
+  created_at: string
+  logo_url: string | null
+}
+
+export interface PublicSponsor {
+  id: string
+  company: string
+  website: string | null
+  instagram: string | null
+  tier_name: string | null
+  weight: number
+  logo_url: string | null
+}
+
+export interface SponsorPage {
+  season_name: string
+  open: boolean
+  pitch: string | null
+  players: number
+  matches_played: number
+  categories: {
+    name: string; phase: string; players: number
+    start_date: string | null; final_date: string | null; champion: string | null
+  }[]
+  tiers: Tier[]
+  sponsors: PublicSponsor[]
+}
+
+export interface SponsorForm {
+  tier_id: string
+  company: string
+  contact_name: string
+  phone: string
+  email?: string | null
+  website?: string | null
+  instagram?: string | null
+  message?: string | null
+  logo?: string | null
+}
+
+export interface ChampionCard {
+  season: string; category: string; champion: string
+  runner_up: string | null; score: string | null; sponsors: PublicSponsor[]
+}
+
+export interface MatchCardData {
+  season: string; category: string; stage: string
+  player1: string; player2: string; winner_side: number | null
+  score: string; played_on: string | null; sponsors: PublicSponsor[]
+}

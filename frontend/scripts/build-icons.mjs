@@ -15,6 +15,9 @@ const WANT = {
   bell: 'bell-bing-bold', tennis: 'tennis-bold', crown: 'crown-bold', flag: 'flag-bold',
   close: 'close-circle-outline', arrowRight: 'alt-arrow-right-outline', history: 'history-bold',
   chat: 'chat-round-dots-bold', sort: 'sort-vertical-outline',
+  share: 'share-bold', download: 'download-minimalistic-bold', upload: 'gallery-add-bold',
+  trash: 'trash-bin-minimalistic-bold', money: 'hand-money-bold', heart: 'heart-bold',
+  plus: 'widget-add-bold', refresh: 'refresh-bold', star: 'star-bold',
 }
 
 const out = {}

@@ -2,6 +2,7 @@
 
 import type { Match, MatchStatus, Score } from '@/lib/types'
 import { MATCH_STATUS, cn, fmtDate, fmtDateTime, nameOr, stageLabel } from '@/lib/utils'
+import { Icon } from './Icon'
 import { Badge } from './ui'
 
 const TONE: Record<MatchStatus, 'neutral' | 'good' | 'warn' | 'bad' | 'info'> = {
@@ -56,7 +57,14 @@ export function MatchCard({ match, nGroups, highlight, children, className }: {
         <span className="eyebrow text-[10px]">
           {stageLabel(match, nGroups)}{match.deadline && match.status !== 'confirmed' && ` · até ${fmtDate(match.deadline)}`}
         </span>
-        <span className="flex gap-1">
+        <span className="flex items-center gap-1">
+          {showScore && match.player1 && match.player2 && (
+            <a href={`/compartilhar/jogo/${match.id}`} target="_blank" rel="noopener noreferrer"
+              className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-court"
+              aria-label="Compartilhar placar" title="Compartilhar placar">
+              <Icon name="share" className="h-4 w-4" />
+            </a>
+          )}
           {special && <Badge tone="warn">{special}</Badge>}
           <Badge tone={TONE[match.status]}>{MATCH_STATUS[match.status]}</Badge>
         </span>

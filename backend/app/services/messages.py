@@ -57,7 +57,7 @@ def champion(category: str, name: str, sponsors: list[str] | None = None,
              card_url: str | None = None) -> str:
     txt = f"👑 {name} é o campeão da categoria {category}!"
     if sponsors:
-        txt += "\nOferecimento: " + ", ".join(sponsors) + " 🔩"
+        txt += "\nOferecimento: " + ", ".join(sponsors) + " 🎾"
     if card_url:
         txt += f"\nCartão do campeão: {card_url}"
     return txt
@@ -65,13 +65,13 @@ def champion(category: str, name: str, sponsors: list[str] | None = None,
 
 def sponsor_submitted(company: str, tier: str, contact: str, phone: str, admin_url: str) -> str:
     """Privado para a organização: chegou uma ficha pelo link de patrocínio."""
-    return (f"🔩 Ficha de patrocínio nova!\n{company} quer a cota {tier}.\n"
+    return (f"🐒 Ficha de patrocínio nova!\n{company} quer a cota {tier}.\n"
             f"Contato: {contact} — wa.me/{phone}\nAprovar: {admin_url}")
 
 
 def sponsor_approved(company: str, season: str) -> str:
-    return (f"🔩 {company} agora patrocina a {season}! Alguém aí finalmente apertou "
-            "um parafuso dessa turma. Valeu demais! 🎾")
+    return (f"🐒 {company} entrou para o bando: agora patrocina a {season}! "
+            "Valeu demais pela força. 🎾")
 
 
 def member_approved(name: str) -> str:

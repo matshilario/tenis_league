@@ -3,9 +3,10 @@
 /**
  * "Patrocine este torneio" — página pública que a organização compartilha.
  *
- * Direção: um "termo oficial de adoção de parafusos". A seriedade editorial da liga
- * (Fraunces, papel creme, carimbo de laudo) contra o caos assumido da turma (ferragens
- * em pixel caindo da página). A piada é carinhosa: faltam parafusos, sobra amor ao tênis.
+ * Direção: um "prontuário" oficial da turma. A seriedade editorial da liga (Fraunces,
+ * papel creme, carimbo de laudo) contra o caos assumido da quadra: bolas caindo e os
+ * macacos-prego que dividem a quadra com a gente. Falta juízo, sobra amor ao tênis;
+ * cada cota é um primata para adotar.
  */
 
 import { useMutation, useQuery } from '@tanstack/react-query'
@@ -18,20 +19,21 @@ import { Icon } from '@/components/Icon'
 import { RevealTitle } from '@/components/RevealTitle'
 import { Button, ErrorBox, Field, Input, Spinner, Textarea, buttonClass } from '@/components/ui'
 import { api, errorMessage } from '@/lib/api'
-import { fmtMoney, logoToPng, tierSprite } from '@/lib/sponsor'
+import { tierPrimate } from '@/lib/pixelArt'
+import { fmtMoney, logoToPng } from '@/lib/sponsor'
 import type { SponsorPage, Tier } from '@/lib/types'
 import { cn, fmtDate } from '@/lib/utils'
-import { PixelTool, type ToolName } from './PixelTool'
+import { PixelArt } from './PixelArt'
 import { SponsorLogos } from './SponsorLogos'
 
-// só em telas largas: no celular passariam por cima do texto
-const FALLING: { tool: ToolName; left: string; delay: number; size: number }[] = [
-  { tool: 'screw', left: '2%', delay: 0, size: 3 },
-  { tool: 'nut', left: '18%', delay: 2.2, size: 3 },
-  { tool: 'screw', left: '34%', delay: 4.1, size: 3 },
-  { tool: 'screw', left: '64%', delay: 1.3, size: 4 },
-  { tool: 'nut', left: '80%', delay: 3.4, size: 4 },
-  { tool: 'screw', left: '92%', delay: 5.2, size: 3 },
+// bolas quicando pelo topo (só em telas largas: no celular passariam por cima do texto)
+const FALLING: { left: string; delay: number; size: number }[] = [
+  { left: '3%', delay: 0, size: 4 },
+  { left: '19%', delay: 2.2, size: 3 },
+  { left: '36%', delay: 4.1, size: 3 },
+  { left: '61%', delay: 1.3, size: 4 },
+  { left: '79%', delay: 3.4, size: 5 },
+  { left: '93%', delay: 5.2, size: 3 },
 ]
 
 export function SponsorLanding({ slug }: { slug: string }) {
@@ -41,8 +43,8 @@ export function SponsorLanding({ slug }: { slug: string }) {
     return (
       <div className="mx-auto grid min-h-screen max-w-md place-items-center px-4 text-center">
         <div className="space-y-4">
-          <PixelTool name="screw" scale={6} className="mx-auto" />
-          <h1 className="text-title font-semibold">Esse parafuso rolou para longe.</h1>
+          <PixelArt name="pregoBall" scale={6} className="mx-auto" />
+          <h1 className="text-title font-semibold">Um macaco levou esse link embora.</h1>
           <p className="text-muted-foreground">{errorMessage(q.error)}</p>
         </div>
         <CourtStrip />
@@ -64,10 +66,17 @@ function Landing({ slug, page }: { slug: string; page: SponsorPage }) {
     gsap.registerPlugin(ScrollTrigger)
     const ctx = gsap.context(() => {
       gsap.utils.toArray<HTMLElement>('[data-fall]').forEach((n) => {
-        gsap.fromTo(n, { y: -60, rotation: 0, autoAlpha: 0.9 }, {
-          y: () => (n.parentElement?.clientHeight ?? 600) + 40, rotation: 360,
-          duration: 7, ease: 'power1.in', repeat: -1, delay: Number(n.dataset.delay || 0),
-        })
+        // queda com quiques (bola de tênis), em loop
+        const H = () => (n.parentElement?.clientHeight ?? 600)
+        gsap.timeline({ repeat: -1, delay: Number(n.dataset.delay || 0) })
+          .set(n, { autoAlpha: 0.95, y: -40 })
+          .to(n, { y: () => H() * 0.72, duration: 1.4, ease: 'power2.in' })
+          .to(n, { y: () => H() * 0.5, duration: 0.55, ease: 'power2.out' })
+          .to(n, { y: () => H() * 0.72, duration: 0.55, ease: 'power2.in' })
+          .to(n, { y: () => H() * 0.64, duration: 0.3, ease: 'power2.out' })
+          .to(n, { y: () => H() * 0.72, duration: 0.3, ease: 'power2.in' })
+          .to(n, { autoAlpha: 0, duration: 0.6, delay: 0.8 })
+          .to({}, { duration: 2.5 })
       })
       gsap.utils.toArray<HTMLElement>('[data-sr]').forEach((n) => {
         gsap.from(n, {
@@ -100,7 +109,7 @@ function Landing({ slug, page }: { slug: string; page: SponsorPage }) {
           {FALLING.map((f, i) => (
             <span key={i} data-fall data-delay={f.delay}
               className="absolute top-0 hidden opacity-0 sm:block" style={{ left: f.left }}>
-              <PixelTool name={f.tool} scale={f.size} />
+              <PixelArt name="ball" scale={f.size} />
             </span>
           ))}
         </div>
@@ -115,26 +124,28 @@ function Landing({ slug, page }: { slug: string; page: SponsorPage }) {
             Patrocine a {page.season_name}
           </p>
           <RevealTitle
-            text="Perdemos uns parafusos. A paixão pelo tênis ficou inteira."
+            text="Juízo a gente perdeu. A paixão pelo tênis ficou inteira."
             className="mt-3 max-w-4xl text-[clamp(2.5rem,1.4rem+5vw,5.6rem)] font-semibold leading-[0.98] tracking-[-0.025em]" />
 
           <div className="mt-8 grid gap-8 sm:grid-cols-[1.4fr_1fr] sm:items-end">
             <p className="max-w-xl text-lg leading-relaxed text-ink/85 dark:text-foreground/85">
-              A Duvis Cup é a liga de uma turma que joga tênis com muito mais coração do que juízo.
-              Gente boa, que respeita o adversário e não recusa um super tie-break. Faltam alguns
-              parafusos na cabeça de cada um, e é aí que entra a sua marca.
+              A Duvis Cup é a liga de uma turma que joga tênis com muito mais coração do que juízo,
+              numa quadra dividida com macacos-prego que roubam a bola sem pedir licença. Gente boa,
+              que respeita o adversário e não recusa um super tie-break. Falta juízo, sobra paixão,
+              e é aí que entra a sua marca.
             </p>
-            <div className="relative justify-self-start sm:justify-self-end">
+            <div className="relative flex items-end gap-4 justify-self-start sm:justify-self-end">
+              <PixelArt name="pregoBall" scale={5} title="Macaco-prego com a bola" />
               <div data-stamp className="rotate-[-7deg] rounded-md border-[3px] border-destructive/80 px-4 py-2 text-destructive/90 mix-blend-multiply dark:mix-blend-normal">
                 <p className="font-pixel text-[11px] uppercase tracking-wider">Laudo da organização</p>
-                <p className="font-display text-xl font-semibold leading-tight">Parafuso a menos,<br />coração a mais.</p>
+                <p className="font-display text-xl font-semibold leading-tight">Juízo a menos,<br />coração a mais.</p>
               </div>
             </div>
           </div>
 
           <div className="mt-10 flex flex-wrap gap-3">
             <a href="#cotas" className={buttonClass('accent', 'lg')}>
-              <Icon name="money" className="h-5 w-5" /> Quero apertar um parafuso
+              <Icon name="money" className="h-5 w-5" /> Quero adotar um primata
             </a>
             <a href="#vitrine" className={buttonClass('ghost', 'lg')}>Onde minha marca aparece</a>
           </div>
@@ -184,10 +195,10 @@ function Landing({ slug, page }: { slug: string; page: SponsorPage }) {
 
         {/* ------------------------------------------------- COTAS */}
         <section id="cotas" aria-labelledby="cotas-t" className="scroll-mt-6">
-          <SectionTitle id="cotas-t" kicker="Caixa de ferramentas" title="Escolha seu parafuso" />
+          <SectionTitle id="cotas-t" kicker="O bando" title="Escolha seu primata" />
           <p className="mt-3 max-w-xl text-muted-foreground">
-            Cada cota aperta um pedacinho da turma. Os valores ajudam com bolas, troféu, quadra e
-            a resenha da final.
+            Cada cota é um primata para adotar. O dinheiro vira bolas, troféu, quadra e a resenha
+            da final.
           </p>
           <div className="mt-8 grid gap-5 md:grid-cols-3">
             {page.tiers.map((t) => <TierCard key={t.id} tier={t} open={page.open}
@@ -199,16 +210,16 @@ function Landing({ slug, page }: { slug: string; page: SponsorPage }) {
         <section id="vitrine" aria-labelledby="vitrine-t" className="scroll-mt-6">
           <SectionTitle id="vitrine-t" kicker="Vitrine" title="Onde sua marca aparece" />
           <div className="mt-8 grid items-center gap-10 md:grid-cols-[minmax(0,420px)_1fr]">
-            <ChampionPreview season={page.season_name} />
+            <ChampionPreview />
             <ul className="space-y-5">
               {[
                 ['Cartão do campeão', 'A imagem que roda nos grupos de WhatsApp quando sai o campeão. As cotas maiores aparecem em destaque.'],
                 ['Cartões de resultado', 'Todo placar compartilhado leva as logos do torneio no rodapé.'],
-                ['Site do torneio', 'A faixa "Parafusos apertados por" estampa o site durante o prazo da cota.'],
+                ['Site do torneio', 'A faixa de patrocinadores estampa o site durante o prazo da cota.'],
                 ['Grupo da liga', 'A organização anuncia sua entrada para a turma toda. Com carinho e zoeira na medida.'],
               ].map(([t, d]) => (
                 <li key={t} data-sr className="flex gap-3">
-                  <PixelTool name="screw" scale={2} className="mt-1 shrink-0" />
+                  <PixelArt name="ball" scale={4} className="mt-1 shrink-0" />
                   <div>
                     <p className="font-semibold">{t}</p>
                     <p className="text-[15px] text-muted-foreground">{d}</p>
@@ -221,27 +232,27 @@ function Landing({ slug, page }: { slug: string; page: SponsorPage }) {
 
         {page.sponsors.length > 0 && (
           <section aria-labelledby="ja" data-sr>
-            <SectionTitle id="ja" kicker="Mural" title="Quem já apertou um parafuso" />
+            <SectionTitle id="ja" kicker="Mural" title="Quem já entrou para o bando" />
             <SponsorLogos sponsors={page.sponsors} size="lg" className="mt-8" />
           </section>
         )}
 
         {/* ------------------------------------------------- TERMO */}
         <section id="termo" aria-labelledby="termo-t" className="scroll-mt-6">
-          <SectionTitle id="termo-t" kicker="Papelada" title="Termo de adoção de parafusos" />
+          <SectionTitle id="termo-t" kicker="Papelada" title="Termo de adoção de primata" />
           {page.open && firstOpen
             ? <AdoptionForm slug={slug} tiers={page.tiers} tierId={tierId ?? firstOpen.id} onTier={setTierId} />
             : (
               <p className="mt-6 max-w-xl rounded-lg border border-dashed p-5 text-muted-foreground">
                 As cotas deste torneio estão fechadas no momento. Quer ajudar mesmo assim? Fale com a
-                organização, que a gente sempre arruma um parafuso.
+                organização, que sempre cabe mais um no bando.
               </p>
             )}
         </section>
       </main>
 
       <footer className="mx-auto max-w-5xl px-4 pb-8 text-sm text-muted-foreground">
-        Duvis Cup · liga amadora de tênis da nossa turma. Nenhum parafuso foi maltratado na produção desta página.
+        Duvis Cup · liga amadora de tênis da nossa turma. Nenhum primata foi maltratado na produção desta página.
       </footer>
       <CourtStrip />
     </div>
@@ -279,7 +290,7 @@ function TierCard({ tier, open, selected, onChoose }: {
       !tier.available && 'opacity-70',
     )}>
       <div className="flex items-start justify-between gap-3">
-        <PixelTool name={tierSprite(tier.weight)} scale={4} />
+        <PixelArt name={tierPrimate(tier.weight)} scale={5} title={tier.name} />
         <span className={cn('rounded-full px-2.5 py-1 font-pixel text-[10px] uppercase tracking-wider',
           hero ? 'bg-lime text-accent-foreground' : 'bg-muted text-muted-foreground')}>
           {!tier.available ? 'Esgotada' : left === null ? 'Vagas à vontade' : left === 1 ? 'Última vaga' : `${left} vagas`}
@@ -306,21 +317,13 @@ function TierCard({ tier, open, selected, onChoose }: {
   )
 }
 
-/** Prévia do cartão do campeão com o espaço da logo (o cartão real sai igual). */
-function ChampionPreview({ season }: { season: string }) {
+/** Exemplo do cartão do campeão (a mesma imagem gerada de verdade, com a sua logo no lugar). */
+function ChampionPreview() {
   return (
-    <figure data-sr aria-label="Exemplo do cartão do campeão com espaço para a sua logo"
-      className="rotate-[-1.5deg] overflow-hidden rounded-lg bg-court-deep p-6 text-[#f6efdf] shadow-[0_24px_60px_-28px_rgb(0_0_0/0.6)]">
-      <p className="font-pixel text-[11px] uppercase tracking-wider text-lime">{season} · Campeão</p>
-      <p className="mt-3 font-display text-4xl font-semibold leading-none">Fulano<br />de Tal</p>
-      <p className="mt-3 font-pixel text-sm text-[#f6efdf]/80">6/4 3/6 [10/8]</p>
-      <div className="mt-6 flex items-center gap-3 border-t border-[#f6efdf]/20 pt-4">
-        <span className="font-pixel text-[10px] uppercase tracking-wider text-[#f6efdf]/70">Oferecimento</span>
-        <span className="grid h-12 flex-1 place-items-center rounded-md border-2 border-dashed border-lime/80 font-pixel text-xs uppercase text-lime">
-          Sua logo aqui
-        </span>
-      </div>
-    </figure>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img data-sr src="/compartilhar/exemplo/imagem" width={1080} height={1350} loading="lazy"
+      alt="Exemplo do cartão do campeão, com o espaço da sua logo no rodapé"
+      className="h-auto w-full rotate-[-1.5deg] rounded-lg shadow-[0_24px_60px_-28px_rgb(0_0_0/0.6)]" />
   )
 }
 
@@ -351,10 +354,10 @@ function AdoptionForm({ slug, tiers, tierId, onTier }: {
     return (
       <div role="status" className="mt-8 max-w-2xl rounded-lg border-2 border-court bg-card p-6 shadow-card">
         <div className="flex items-center gap-4">
-          <PixelTool name={tierSprite(tier?.weight ?? 1)} scale={5} />
+          <PixelArt name={tierPrimate(tier?.weight ?? 1)} scale={5} />
           <div>
             <p className="font-pixel text-[11px] uppercase tracking-wider text-court">Termo recebido</p>
-            <p className="font-display text-2xl font-semibold">Parafuso apertado (quase)!</p>
+            <p className="font-display text-2xl font-semibold">Primata adotado (quase)!</p>
           </div>
         </div>
         <p className="mt-4 text-[15px]">

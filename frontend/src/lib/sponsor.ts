@@ -31,6 +31,3 @@ export async function logoToPng(file: File, max = 800): Promise<string> {
   }
 }
 
-/** Ícone em pixel de cada cota pelo peso: 1 parafuso, 2 porca, 3 chave de fenda. */
-export const tierSprite = (weight: number) => (weight >= 3 ? 'driver' : weight === 2 ? 'nut' : 'screw') as
-  'screw' | 'nut' | 'driver'

@@ -44,7 +44,7 @@ async def test_patrocinio_completo(client, sent):
     slug = sp["slug"]
     assert sp["url"].endswith(f"/patrocine/{slug}")
     tiers = {t["name"]: t for t in sp["tiers"]}
-    assert set(tiers) == {"Parafuso Solto", "Porca Maluca", "Chave Mestra"}
+    assert set(tiers) == {"Sagui", "Macaco-prego", "Gorila"}
 
     # página pública, sem login
     r = await c.get(f"{API}/public/sponsor/{slug}")
@@ -54,7 +54,7 @@ async def test_patrocinio_completo(client, sent):
     assert (await c.get(f"{API}/public/sponsor/nao-existe")).status_code == 404
 
     # ficha com logo inválida / telefone inválido
-    master = tiers["Chave Mestra"]["id"]
+    master = tiers["Gorila"]["id"]
     r = await c.post(f"{API}/public/sponsor/{slug}", json=ficha(master, logo="data:image/png;base64,AAAA"))
     assert r.status_code == 400 and "PNG ou JPEG" in r.json()["detail"]
     r = await c.post(f"{API}/public/sponsor/{slug}", json=ficha(master, phone="123"))
@@ -74,7 +74,7 @@ async def test_patrocinio_completo(client, sent):
 
     # ficha sem logo: não aprova até mandar a logo
     r = await c.post(f"{API}/public/sponsor/{slug}",
-                     json=ficha(tiers["Parafuso Solto"]["id"], company="Bar do Saque", logo=None))
+                     json=ficha(tiers["Sagui"]["id"], company="Bar do Saque", logo=None))
     nolog = r.json()["id"]
     r = await c.patch(f"{API}/admin/sponsors/{nolog}", json={"status": "approved"}, headers=adm)
     assert r.status_code == 400 and "logo" in r.json()["detail"]
@@ -85,14 +85,14 @@ async def test_patrocinio_completo(client, sent):
     z = r.json()
     assert z["visible_until"] and date.fromisoformat(z["visible_until"]) > date.today()
     assert z["instagram"] == "ferragens.ze"
-    assert any("Ferragens Zé agora patrocina" in s for s in sent)
+    assert any("Ferragens Zé entrou para o bando" in s for s in sent)
 
     act = (await c.get(f"{API}/public/sponsors/active")).json()
     assert [a["company"] for a in act] == ["Ferragens Zé"] and act[0]["weight"] == 3
     r = await c.get(act[0]["logo_url"])
     assert r.status_code == 200 and r.headers["content-type"] == "image/png"
 
-    # Chave Mestra tem 1 vaga: esgotou
+    # Gorila tem 1 vaga: esgotou
     page = (await c.get(f"{API}/public/sponsor/{slug}")).json()
     assert next(t for t in page["tiers"] if t["id"] == master)["available"] is False
     r = await c.post(f"{API}/public/sponsor/{slug}", json=ficha(master, company="Outra"))
@@ -110,12 +110,13 @@ async def test_patrocinio_completo(client, sent):
     await c.post(f"{API}/matches/{m['id']}/report", headers=P["P0"]["h"],
                  json={"score": {"sets": oriented(m, "P0", [[6, 4], [6, 3]])}})
     card = (await c.get(f"{API}/public/cards/match/{m['id']}")).json()
+    assert card["sets"] == oriented(m, "P0", [[6, 4], [6, 3]])
     assert card["score"] and [s["company"] for s in card["sponsors"]] == ["Ferragens Zé"]
     assert (await c.get(f"{API}/public/cards/champion/{cat_id}")).status_code == 404
 
     # fechar: página continua (mostra quem já patrocina), mas não aceita ficha
     await c.patch(f"{API}/admin/seasons/{season_id}/sponsorship", json={"open": False}, headers=adm)
-    r = await c.post(f"{API}/public/sponsor/{slug}", json=ficha(tiers["Porca Maluca"]["id"]))
+    r = await c.post(f"{API}/public/sponsor/{slug}", json=ficha(tiers["Macaco-prego"]["id"]))
     assert r.status_code == 400 and "fechadas" in r.json()["detail"]
 
     # novo link invalida o antigo

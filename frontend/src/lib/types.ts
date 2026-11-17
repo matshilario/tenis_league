@@ -220,11 +220,14 @@ export interface SponsorForm {
 
 export interface ChampionCard {
   season: string; category: string; champion: string
-  runner_up: string | null; score: string | null; sponsors: PublicSponsor[]
+  runner_up: string | null; score: string | null
+  sets: number[][]; super_tiebreak: number[] | null; result_type: string | null
+  played_on: string | null; sponsors: PublicSponsor[]
 }
 
 export interface MatchCardData {
   season: string; category: string; stage: string
   player1: string; player2: string; winner_side: number | null
-  score: string; played_on: string | null; sponsors: PublicSponsor[]
+  score: string; sets: number[][]; super_tiebreak: number[] | null; result_type: string | null
+  played_on: string | null; sponsors: PublicSponsor[]
 }

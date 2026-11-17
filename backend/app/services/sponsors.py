@@ -18,19 +18,20 @@ from app.schemas import PublicSponsor, TierOut
 MAX_LOGO_BYTES = 1_500_000
 _SIGS = {b"\x89PNG\r\n\x1a\n": "image/png", b"\xff\xd8\xff": "image/jpeg"}
 
-# Cotas sugeridas ao abrir o patrocínio de um torneio (a organização edita à vontade).
+# Cotas sugeridas ao abrir o patrocínio de um torneio ("escolha seu primata").
+# A organização edita nomes, valores e benefícios à vontade.
 DEFAULT_TIERS = [
-    dict(name="Parafuso Solto", weight=1, price_cents=15000, slots=None, visibility_days=60,
-         tagline="Para quem quer ajudar sem apertar demais.",
+    dict(name="Sagui", weight=1, price_cents=15000, slots=None, visibility_days=60,
+         tagline="Pequeno, ligeiro e sempre por perto da quadra.",
          perks=["Logo no site do torneio", "Agradecimento no grupo da liga"]),
-    dict(name="Porca Maluca", weight=2, price_cents=30000, slots=6, visibility_days=90,
-         tagline="Segura firme o que ainda resta da turma.",
+    dict(name="Macaco-prego", weight=2, price_cents=30000, slots=6, visibility_days=90,
+         tagline="O dono da quadra: rouba a bola e a cena.",
          perks=["Logo em destaque no site", "Logo nos cartões de resultado e de campeão",
                 "Agradecimento no grupo da liga"]),
-    dict(name="Chave Mestra", weight=3, price_cents=80000, slots=1, visibility_days=180,
-         tagline="Só uma. Aperta tudo. Nome no torneio.",
+    dict(name="Gorila", weight=3, price_cents=80000, slots=1, visibility_days=180,
+         tagline="Só um. Manda em tudo. Nome no torneio.",
          perks=["“Duvis Cup apresentada por” você", "Logo gigante no cartão do campeão",
-                "Logo no topo do site por 6 meses", "Entrega do troféu na final"]),
+                "Logo no topo do site por 6 meses"]),
 ]
 
 

@@ -8,7 +8,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   const title = page ? `Patrocine a ${page.season_name}` : 'Patrocine a Duvis Cup'
   return {
     title,
-    description: 'Perdemos uns parafusos. A paixão pelo tênis ficou inteira. Ajude a turma e estampe sua marca no torneio.',
+    description: 'Juízo a gente perdeu. A paixão pelo tênis ficou inteira. Escolha seu primata e estampe sua marca no torneio.',
     openGraph: { title, type: 'website' },
   }
 }

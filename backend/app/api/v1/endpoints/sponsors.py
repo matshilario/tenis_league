@@ -174,14 +174,26 @@ async def champion_card(category_id: uuid.UUID, db: DB):
     season = await db.get(Season, cat.season_id)
     champ = await db.get(Entry, cat.champion_entry_id)
     final = (await L.get_matches(db, cat, Stage.FINAL) or [None])[0]
-    runner, score = None, None
+    runner, score, sets, stb, rt, played = None, None, [], None, None, None
     if final and final.winner_side:
         loser = final.entry2 if final.winner_side == 1 else final.entry1
         runner = L.name_of(loser) if loser else None
         score = format_score(final.score, final.result_type or "normal") if final.score else None
+        sets, stb = _sets(final.score, flip=final.winner_side == 2)
+        rt, played = final.result_type, final.played_on
     return ChampionCard(season=season.name, category=cat.name, champion=L.name_of(champ),
-                        runner_up=runner, score=score,
+                        runner_up=runner, score=score, sets=sets, super_tiebreak=stb,
+                        result_type=rt, played_on=played,
                         sponsors=await _card_sponsors(db, season.id))
+
+
+def _sets(score: dict | None, flip: bool) -> tuple[list[list[int]], list[int] | None]:
+    """Sets e super tie-break do placar; `flip` inverte para a visão do outro lado."""
+    if not score:
+        return [], None
+    f = (lambda p: [p[1], p[0]]) if flip else (lambda p: list(p))
+    stb = score.get("super_tiebreak")
+    return [f(s) for s in score.get("sets") or []], (f(stb) if stb else None)
 
 
 @public.get("/cards/match/{match_id}", response_model=MatchCard)
@@ -195,6 +207,8 @@ async def match_card(match_id: uuid.UUID, db: DB):
                      player1=L.name_of(m.entry1), player2=L.name_of(m.entry2),
                      winner_side=m.winner_side,
                      score=format_score(m.score, m.result_type or "normal"),
+                     sets=_sets(m.score, False)[0], super_tiebreak=_sets(m.score, False)[1],
+                     result_type=m.result_type,
                      played_on=m.played_on, sponsors=await _card_sponsors(db, season.id))
 
 

@@ -40,7 +40,7 @@ export function SponsorLogos({ sponsors, size = 'md', className }: {
 }
 
 /**
- * Faixa "Parafusos apertados por" — estampa o site com as logos dentro do prazo de
+ * Faixa de patrocinadores — estampa o site com as logos dentro do prazo de
  * exibição de cada cota. Não aparece nada quando não há patrocinador ativo.
  */
 export function SponsorBar({ className }: { className?: string }) {
@@ -51,7 +51,7 @@ export function SponsorBar({ className }: { className?: string }) {
   return (
     <aside aria-label="Patrocinadores" className={cn('rounded-lg border border-dashed border-olive/40 px-4 py-3', className)}>
       <p className="mb-2 font-pixel text-[11px] uppercase tracking-wider text-muted-foreground">
-        {master ? `Duvis Cup apresentada por ${master.company} · ` : ''}Parafusos apertados por
+        {master ? `Duvis Cup apresentada por ${master.company} · ` : ''}Oferecimento
       </p>
       <SponsorLogos sponsors={list} size="sm" />
     </aside>

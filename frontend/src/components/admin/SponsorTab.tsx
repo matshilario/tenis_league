@@ -3,12 +3,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { Icon } from '@/components/Icon'
-import { PixelTool } from '@/components/sponsors/PixelTool'
+import { PixelArt } from '@/components/sponsors/PixelArt'
 import {
   Badge, Button, Card, Empty, ErrorBox, Field, Input, Select, Spinner, Textarea, buttonClass,
 } from '@/components/ui'
 import { api, apiUrl, errorMessage } from '@/lib/api'
-import { fmtMoney, logoToPng, tierSprite } from '@/lib/sponsor'
+import { tierPrimate } from '@/lib/pixelArt'
+import { fmtMoney, logoToPng } from '@/lib/sponsor'
 import type { Sponsor, Sponsorship, SponsorStatus, Tier } from '@/lib/types'
 import { useCategory } from '@/lib/useCategory'
 import { fmtDate, fmtPhone } from '@/lib/utils'
@@ -20,8 +21,8 @@ const STATUS: Record<SponsorStatus, { label: string; tone: 'warn' | 'good' | 'ba
 }
 
 const shareText = (s: Sponsorship) =>
-  `🔩 A ${s.season_name} está procurando quem aperte uns parafusos da turma. ` +
-  `Patrocine o torneio e estampe sua marca no cartão do campeão: ${s.url}`
+  `🐒 A ${s.season_name} está procurando patrocinadores! Escolha seu primata e ` +
+  `estampe sua marca no cartão do campeão: ${s.url}`
 
 export function SponsorTab() {
   const { season, seasons } = useCategory()
@@ -231,7 +232,7 @@ function Tiers({ seasonId, tiers }: { seasonId: string; tiers: Tier[] }) {
           : (
             <Card key={t.id} className="space-y-2">
               <div className="flex items-center justify-between">
-                <PixelTool name={tierSprite(t.weight)} scale={3} />
+                <PixelArt name={tierPrimate(t.weight)} scale={3} />
                 <Badge>{t.slots === null ? `${t.taken} aprovados` : `${t.taken}/${t.slots} vagas`}</Badge>
               </div>
               <p className="font-semibold">{t.name}</p>
@@ -286,9 +287,9 @@ function TierForm({ seasonId, tier, onDone }: { seasonId: string; tier?: Tier; o
         <Field label="Dias com a logo no site"><Input type="number" min={1} max={730} value={f.visibility_days} onChange={set('visibility_days')} /></Field>
         <Field label="Destaque da logo">
           <Select value={f.weight} onChange={set('weight')}>
-            <option value="1">1 · parafuso (rodapé)</option>
-            <option value="2">2 · porca (médio)</option>
-            <option value="3">3 · chave (principal)</option>
+            <option value="1">1 · sagui (rodapé)</option>
+            <option value="2">2 · macaco-prego (médio)</option>
+            <option value="3">3 · gorila (principal)</option>
           </Select>
         </Field>
         <div className="md:col-span-3">

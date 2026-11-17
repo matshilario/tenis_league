@@ -24,8 +24,8 @@ export const DAY: Palette = {
   u: '#6b4423', U: '#43280f', z: '#9fbf45',
   // banco e garrafa
   d: '#8a5a32', D: '#5f3c1f', q: '#4f86b8', Q: '#2f5c86', r: '#e9ecf0',
-  // personagens da turma (camiseta preta, short grafite, detalhe neon no tênis)
-  a: '#2a2522', A: '#151210', e: '#3a3f4a', y: '#c8f02a',
+  // personagens da turma (camiseta azul-escura, short grafite, detalhe neon no tênis)
+  a: '#1f3a63', A: '#142844', e: '#3a3f4a', y: '#c8f02a',
   // André: cabelo/barba escuros com fios grisalhos; cigarro com a brasa
   i: '#4a3f37', I: '#9b958b', j: '#ff7a2f',
   // coqueiro
@@ -301,7 +301,7 @@ const M_THROW = [
 ]
 
 // ------------------------------------------------------- personagens da turma
-// De perfil, olhando para a direita. Primeiro da turma: o organizador (camiseta preta),
+// De perfil, olhando para a direita. Primeiro da turma: o organizador (camiseta azul-escura),
 // estrela da cena da cãibra — deitado de costas, uma perna esticada para o alto.
 const B_WALK_A = [
   '................',

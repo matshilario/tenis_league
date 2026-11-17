@@ -236,7 +236,8 @@ export class Buddy {
   head(): { x: number; y: number } {
     const f = this.flip ? -1 : 1
     const s = this.sprite()
-    if (s.startsWith('buddyLie')) return { x: this.x - f * 10, y: this.y - 4 }
+    // deitado: balão acima da perna levantada, para não cobri-la
+    if (s.startsWith('buddyLie')) return { x: this.x - f * 8, y: this.y - 15 }
     if (s === 'buddySit') return { x: this.x - f * 1, y: this.y - 13 }
     return { x: this.x + f, y: this.y - 18 }
   }

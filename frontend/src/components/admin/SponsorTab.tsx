@@ -7,7 +7,7 @@ import { PixelArt } from '@/components/sponsors/PixelArt'
 import {
   Badge, Button, Card, Empty, ErrorBox, Field, Input, Select, Spinner, Textarea, buttonClass,
 } from '@/components/ui'
-import { api, apiUrl, errorMessage } from '@/lib/api'
+import { api, errorMessage } from '@/lib/api'
 import { tierPrimate } from '@/lib/pixelArt'
 import { fmtMoney, logoToPng } from '@/lib/sponsor'
 import type { Sponsor, Sponsorship, SponsorStatus, Tier } from '@/lib/types'
@@ -136,6 +136,23 @@ function Sponsors({ seasonId, tiers }: { seasonId: string; tiers: Tier[] }) {
   )
 }
 
+/** Logo da ficha via endpoint autenticado (a URL pública só serve aprovados). */
+function useAdminLogo(s: Sponsor) {
+  const [src, setSrc] = useState<string | null>(null)
+  useEffect(() => {
+    if (!s.logo_url) { setSrc(null); return }
+    let url: string | null = null
+    let alive = true
+    api.admin.sponsorLogo(s.id).then((b) => {
+      if (!alive) return
+      url = URL.createObjectURL(b)
+      setSrc(url)
+    }).catch(() => alive && setSrc(null))
+    return () => { alive = false; if (url) URL.revokeObjectURL(url) }
+  }, [s.id, s.logo_url])
+  return src
+}
+
 function SponsorRow({ s, tiers }: { s: Sponsor; tiers: Tier[] }) {
   const refresh = useSponsorRefresh(s.season_id)
   const [err, setErr] = useState<string | null>(null)
@@ -146,6 +163,7 @@ function SponsorRow({ s, tiers }: { s: Sponsor; tiers: Tier[] }) {
     onError: (e) => setErr(errorMessage(e)),
   })
   const st = STATUS[s.status]
+  const logoSrc = useAdminLogo(s)
 
   async function upload(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
@@ -159,9 +177,9 @@ function SponsorRow({ s, tiers }: { s: Sponsor; tiers: Tier[] }) {
       <div className="flex flex-wrap items-start gap-4">
         <label className="grid h-16 w-28 shrink-0 cursor-pointer place-items-center overflow-hidden rounded-md border bg-[#fcf8ee] p-1.5"
           title="Trocar logo">
-          {s.logo_url
+          {logoSrc
             // eslint-disable-next-line @next/next/no-img-element
-            ? <img src={apiUrl(s.logo_url)!} alt={`Logo ${s.company}`} className="max-h-full max-w-full object-contain" />
+            ? <img src={logoSrc} alt={`Logo ${s.company}`} className="max-h-full max-w-full object-contain" />
             : <span className="text-center text-xs text-muted-foreground"><Icon name="upload" className="mx-auto h-5 w-5" />sem logo</span>}
           <input type="file" accept="image/*" className="sr-only" onChange={upload} />
         </label>
@@ -195,7 +213,8 @@ function SponsorRow({ s, tiers }: { s: Sponsor; tiers: Tier[] }) {
           <Button size="sm" variant="ghost" disabled={m.isPending} onClick={() => m.mutate(() => api.admin.patchSponsor(s.id, { status: 'rejected' }))}>Recusar</Button>
         )}
         <Select aria-label="Cota" className="h-8 w-auto text-sm" value={s.tier_id ?? ''}
-          onChange={(e) => m.mutate(() => api.admin.patchSponsor(s.id, { tier_id: e.target.value }))}>
+          onChange={(e) => e.target.value && m.mutate(() => api.admin.patchSponsor(s.id, { tier_id: e.target.value }))}>
+          {!s.tier_id && <option value="">Sem cota</option>}
           {tiers.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
         </Select>
         {s.status === 'approved' && (

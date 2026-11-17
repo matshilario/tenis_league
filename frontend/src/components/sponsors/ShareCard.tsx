@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { FullLogo } from '@/components/Brand'
 import { CourtStrip } from '@/components/court/CourtStrip'
 import { Icon } from '@/components/Icon'
@@ -9,7 +9,9 @@ import { buttonClass } from '@/components/ui'
 /** Página pública de um cartão: prévia da imagem e botões de compartilhar/baixar. */
 export function ShareCard({ image, title, text }: { image: string; title: string; text: string }) {
   const [copied, setCopied] = useState(false)
-  const url = typeof window !== 'undefined' ? window.location.href : ''
+  // a URL só existe no navegador: lida depois da hidratação (no servidor o link sairia vazio)
+  const [url, setUrl] = useState('')
+  useEffect(() => setUrl(window.location.href), [])
 
   async function share() {
     try {

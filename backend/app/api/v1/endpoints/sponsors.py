@@ -63,17 +63,30 @@ def _bad(msg: str) -> HTTPException:
 _hits: dict[str, deque] = defaultdict(deque)
 
 
+GLOBAL_LIMIT = 30  # fichas por hora no total (teto contra spam com IPs forjados)
+
+
+def _client_ip(request: Request) -> str:
+    # o proxy da Railway acrescenta o IP real NO FIM do X-Forwarded-For; o começo é do cliente
+    xff = [p.strip() for p in (request.headers.get("x-forwarded-for") or "").split(",") if p.strip()]
+    return xff[-1] if xff else (request.client.host if request.client else "?")
+
+
 def _throttle(request: Request, limit: int = 5, window: int = 3600) -> None:
-    """Fichas públicas: no máximo `limit` por IP por hora (evita spam no WhatsApp)."""
-    ip = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip() or (
-        request.client.host if request.client else "?")
+    """Fichas públicas: no máximo `limit` por IP e GLOBAL_LIMIT no total, por hora
+    (cada ficha manda WhatsApp para a organização)."""
     now = time.monotonic()
-    q = _hits[ip]
-    while q and now - q[0] > window:
-        q.popleft()
-    if len(q) >= limit:
+    for key in list(_hits):  # limpa janelas vencidas (o dicionário não cresce sem limite)
+        q = _hits[key]
+        while q and now - q[0] > window:
+            q.popleft()
+        if not q:
+            del _hits[key]
+    ip = _client_ip(request)
+    if len(_hits.get(ip, ())) >= limit or len(_hits.get("*", ())) >= GLOBAL_LIMIT:
         raise HTTPException(429, "Muitas fichas seguidas. Tenta de novo mais tarde.")
-    q.append(now)
+    _hits[ip].append(now)
+    _hits["*"].append(now)
 
 
 # ----------------------------------------------------------------------- público
@@ -103,7 +116,7 @@ async def sponsor_page(slug: str, db: DB):
     if not players:  # temporada sem inscrições ainda: conta a turma aprovada
         players = set((await db.execute(select(User.id).where(
             User.status == UserStatus.APPROVED, User.role != Role.ADMIN))).scalars())
-    sponsors = await S.season_sponsors(db, season.id, active_only=False)
+    sponsors = await S.approved_sponsors(db, season.id, active_only=False)
     return SponsorPage(season_name=season.name, open=season.sponsor_open,
                        pitch=season.sponsor_pitch, players=len(players), matches_played=played,
                        categories=out_cats, tiers=await S.tiers_out(db, season.id),
@@ -119,7 +132,7 @@ async def sponsor_submit(slug: str, body: SponsorIn, request: Request, db: DB,
     tier = await db.get(SponsorTier, body.tier_id)
     if not tier or tier.season_id != season.id:
         raise _bad("Escolha uma cota.")
-    if not next(t for t in await S.tiers_out(db, season.id) if t.id == tier.id).available:
+    if not await S.tier_has_room(db, tier):
         raise _bad("Essa cota já esgotou. Escolha outra.")
     try:
         phone = normalize_phone(body.phone)
@@ -150,20 +163,21 @@ async def sponsor_submit(slug: str, body: SponsorIn, request: Request, db: DB,
 
 @public.get("/sponsors/active", response_model=list[PublicSponsor])
 async def sponsors_active(db: DB):
-    return [S.public_sponsor(s) for s in await S.active_sponsors(db)]
+    return [S.public_sponsor(s) for s in await S.approved_sponsors(db, active_only=True)]
 
 
 @public.get("/sponsors/{sponsor_id}/logo")
 async def sponsor_logo(sponsor_id: uuid.UUID, db: DB):
+    """Só logos de patrocinadores aprovados são públicas (pendentes/recusados não)."""
     sp = await db.get(Sponsor, sponsor_id)
-    if not sp or not sp.logo:
+    if not sp or not sp.logo or sp.status != SponsorStatus.APPROVED:
         raise HTTPException(404, "Sem logo.")
     return Response(sp.logo, media_type=sp.logo_mime or "image/png",
                     headers={"Cache-Control": "public, max-age=86400"})
 
 
 async def _card_sponsors(db, season_id) -> list[PublicSponsor]:
-    return [S.public_sponsor(s) for s in await S.season_sponsors(db, season_id, active_only=False)]
+    return [S.public_sponsor(s) for s in await S.approved_sponsors(db, season_id, active_only=False)]
 
 
 @public.get("/cards/champion/{category_id}", response_model=ChampionCard)
@@ -217,9 +231,7 @@ def _clean(v: str | None) -> str | None:
     return v or None
 
 
-def _insta(v: str | None) -> str | None:
-    v = _clean(v)
-    return v.lstrip("@").split("/")[-1][:60] if v else None
+_insta = S.instagram_handle
 
 
 # ---------------------------------------------------------------- organização
@@ -286,10 +298,10 @@ async def add_tier(season_id: uuid.UUID, body: TierIn, user: Admin, db: DB):
     return next(x for x in await S.tiers_out(db, season_id) if x.id == t.id)
 
 
-async def _tier(db, tier_id) -> SponsorTier:
+async def _tier(db, tier_id, season_id=None) -> SponsorTier:
     t = await db.get(SponsorTier, tier_id)
-    if not t:
-        raise HTTPException(404, "Cota não encontrada.")
+    if not t or (season_id is not None and t.season_id != season_id):
+        raise HTTPException(404, "Cota não encontrada neste torneio.")
     return t
 
 
@@ -300,7 +312,10 @@ async def patch_tier(tier_id: uuid.UUID, body: TierPatch, user: Admin, db: DB):
     if data.pop("unlimited", None):
         t.slots = None
         data.pop("slots", None)
+    nullable = {"tagline", "slots", "perks"}
     for k, v in data.items():
+        if v is None and k not in nullable:
+            continue  # null em campo obrigatório = "não mexe"
         setattr(t, k, v)
     await db.flush()
     return next(x for x in await S.tiers_out(db, t.season_id) if x.id == t.id)
@@ -328,7 +343,7 @@ async def list_sponsors(season_id: uuid.UUID, user: Admin, db: DB):
 async def add_sponsor(season_id: uuid.UUID, body: SponsorIn, user: Admin, db: DB):
     """Cadastro feito pela organização (patrocinador que chegou por fora do link)."""
     await _season(db, season_id)
-    tier = await _tier(db, body.tier_id)
+    tier = await _tier(db, body.tier_id, season_id)
     try:
         phone = normalize_phone(body.phone)
     except PhoneError as exc:
@@ -355,9 +370,17 @@ async def patch_sponsor(sponsor_id: uuid.UUID, body: SponsorPatch, user: Admin, 
     if not sp:
         raise HTTPException(404, "Patrocinador não encontrado.")
     data = body.model_dump(exclude_unset=True)
-    if "tier_id" in data and data["tier_id"]:
-        await _tier(db, data["tier_id"])
-        sp.tier_id = data["tier_id"]
+    new_status = body.status or sp.status
+    if new_status not in (SponsorStatus.APPROVED, SponsorStatus.REJECTED, SponsorStatus.PENDING):
+        raise _bad("Status inválido.")
+    tier = sp.tier
+    if data.get("tier_id"):
+        tier = await _tier(db, data["tier_id"], sp.season_id)
+    if new_status == SponsorStatus.APPROVED and tier and (tier.id != sp.tier_id or sp.status != new_status):
+        if not await S.tier_has_room(db, tier, exclude=sp.id):
+            raise _bad(f"A cota {tier.name} já está cheia ({tier.slots} vaga(s)).")
+    if tier and tier.id != sp.tier_id:
+        sp.tier_id = tier.id
         await db.flush()
         await db.refresh(sp, ["tier"])
     if body.logo:
@@ -365,15 +388,15 @@ async def patch_sponsor(sponsor_id: uuid.UUID, body: SponsorPatch, user: Admin, 
             sp.logo, sp.logo_mime = S.decode_logo(body.logo)
         except S.SponsorError as exc:
             raise _bad(str(exc))
-    for k in ("company", "website", "instagram"):
-        if k in data:
-            setattr(sp, k, _insta(data[k]) if k == "instagram" else _clean(data[k]))
+    if data.get("company"):
+        sp.company = data["company"].strip()
+    if "website" in data:
+        sp.website = _clean(data["website"])
+    if "instagram" in data:
+        sp.instagram = _insta(data["instagram"])
     if "visible_until" in data:
         sp.visible_until = data["visible_until"]
     if body.status and body.status != sp.status:
-        if body.status not in (SponsorStatus.APPROVED, SponsorStatus.REJECTED,
-                               SponsorStatus.PENDING):
-            raise _bad("Status inválido.")
         if body.status == SponsorStatus.APPROVED:
             if not sp.logo:
                 raise _bad("Sem logo ainda: envie a logo antes de aprovar.")
@@ -387,6 +410,15 @@ async def patch_sponsor(sponsor_id: uuid.UUID, body: SponsorPatch, user: Admin, 
         await L.audit(db, user, "sponsor", f"{sp.company}: {body.status}")
     await db.flush()
     return _sponsor_out(sp)
+
+
+@admin.get("/sponsors/{sponsor_id}/logo")
+async def admin_sponsor_logo(sponsor_id: uuid.UUID, user: Admin, db: DB):
+    sp = await db.get(Sponsor, sponsor_id)
+    if not sp or not sp.logo:
+        raise HTTPException(404, "Sem logo.")
+    return Response(sp.logo, media_type=sp.logo_mime or "image/png",
+                    headers={"Cache-Control": "private, no-store"})
 
 
 @admin.delete("/sponsors/{sponsor_id}")

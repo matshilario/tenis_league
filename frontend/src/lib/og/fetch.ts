@@ -1,5 +1,7 @@
 /** Busca na API pública a partir do servidor (metadados e imagens de compartilhamento). */
-export const API_ORIGIN = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+import { API_ORIGIN } from '@/lib/api'
+
+export { API_ORIGIN }
 
 export async function fetchPublic<T>(path: string): Promise<T | null> {
   try {

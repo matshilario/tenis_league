@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import re
+import zlib
 import secrets
 import unicodedata
 import uuid
@@ -63,7 +64,8 @@ def decode_logo(data_url: str) -> tuple[bytes, str]:
 def logo_url(s: Sponsor) -> str | None:
     if not s.logo:
         return None
-    v = int((s.approved_at or s.created_at).timestamp())
+    # versão = conteúdo da logo: trocar a logo muda a URL (o endpoint tem cache de 1 dia)
+    v = format(zlib.crc32(s.logo), "x")
     return f"/api/v1/public/sponsors/{s.id}/logo?v={v}"
 
 
@@ -100,12 +102,16 @@ async def ensure_default_tiers(db: AsyncSession, season: Season) -> None:
     await db.flush()
 
 
-async def season_sponsors(db: AsyncSession, season_id: uuid.UUID, *, active_only: bool
-                          ) -> list[Sponsor]:
-    """Aprovados do torneio, do maior peso para o menor. `active_only` respeita o prazo
-    de exibição no site (visible_until); os cartões do torneio mostram todos."""
-    q = select(Sponsor).where(Sponsor.season_id == season_id,
-                              Sponsor.status == SponsorStatus.APPROVED)
+async def approved_sponsors(db: AsyncSession, season_id: uuid.UUID | None = None, *,
+                            active_only: bool) -> list[Sponsor]:
+    """Patrocinadores aprovados, do maior peso para o menor.
+
+    `season_id`: só os daquele torneio (cartões); None = todos (faixa do site).
+    `active_only`: respeita o prazo de exibição no site (visible_until).
+    """
+    q = select(Sponsor).where(Sponsor.status == SponsorStatus.APPROVED)
+    if season_id is not None:
+        q = q.where(Sponsor.season_id == season_id)
     if active_only:
         q = q.where((Sponsor.visible_until.is_(None)) | (Sponsor.visible_until >= date.today()))
     res = await db.execute(q.order_by(Sponsor.approved_at))
@@ -114,12 +120,23 @@ async def season_sponsors(db: AsyncSession, season_id: uuid.UUID, *, active_only
     return items
 
 
-async def active_sponsors(db: AsyncSession) -> list[Sponsor]:
-    """Logos que estampam o site agora (de qualquer torneio, dentro do prazo)."""
-    q = select(Sponsor).where(
-        Sponsor.status == SponsorStatus.APPROVED,
-        (Sponsor.visible_until.is_(None)) | (Sponsor.visible_until >= date.today()))
-    res = await db.execute(q.order_by(Sponsor.approved_at))
-    items = list(res.scalars().unique())
-    items.sort(key=lambda s: -(s.tier.weight if s.tier else 1))
-    return items
+async def tier_has_room(db: AsyncSession, tier: SponsorTier, exclude: uuid.UUID | None = None) -> bool:
+    """A cota ainda tem vaga para mais um aprovado (sem contar `exclude`)?"""
+    if tier.slots is None:
+        return True
+    q = select(func.count()).select_from(Sponsor).where(
+        Sponsor.tier_id == tier.id, Sponsor.status == SponsorStatus.APPROVED)
+    if exclude is not None:
+        q = q.where(Sponsor.id != exclude)
+    return (await db.scalar(q) or 0) < tier.slots
+
+
+def instagram_handle(v: str | None) -> str | None:
+    """'@loja', 'instagram.com/loja/' ou 'https://www.instagram.com/loja?igshid=x' -> 'loja'."""
+    v = (v or "").strip()
+    if not v:
+        return None
+    v = re.split(r"[?#]", v, maxsplit=1)[0].rstrip("/")
+    v = re.sub(r"^(https?://)?(www\.)?instagram\.com/", "", v, flags=re.I)
+    v = v.lstrip("@").split("/")[0]
+    return v[:60] or None

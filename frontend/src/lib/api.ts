@@ -106,6 +106,9 @@ export const api = {
       company: string; website: string; instagram: string; logo: string
     }>) => patch<Sponsor>(`/admin/sponsors/${id}`, body),
     deleteSponsor: (id: string) => del(`/admin/sponsors/${id}`),
+    /** Logo pelo endpoint autenticado (inclui fichas pendentes, que não são públicas). */
+    sponsorLogo: (id: string) =>
+      http.get<Blob>(`/admin/sponsors/${id}/logo`, { responseType: 'blob' }).then((r) => r.data),
 
     invites: () => get<Invite[]>('/admin/invites'),
     createInvite: (body: { note?: string; max_uses?: number; expires_in_days?: number | null }) =>

@@ -137,3 +137,78 @@ async def test_limite_de_fichas_por_ip(client):
     codes = [(await c.post(f"{API}/public/sponsor/{sp['slug']}",
                            json=ficha(tier, company=f"E{i}"))).status_code for i in range(6)]
     assert codes == [201] * 5 + [429]
+
+
+def other_png() -> str:
+    """PNG válido diferente do tiny_png (outra cor)."""
+    def chunk(t, d):
+        return struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d))
+    raw = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0)) \
+        + chunk(b"IDAT", zlib.compress(b"\x00\x00\x00\xff")) + chunk(b"IEND", b"")
+    return "data:image/png;base64," + base64.b64encode(raw).decode()
+
+
+async def _open(c, adm, name="Copa"):
+    sid = (await c.post(f"{API}/admin/seasons", json={"name": name}, headers=adm)).json()["id"]
+    sp = (await c.patch(f"{API}/admin/seasons/{sid}/sponsorship", json={"open": True}, headers=adm)).json()
+    return sid, sp, {t["name"]: t["id"] for t in sp["tiers"]}
+
+
+async def test_regras_de_cota_logo_e_validacoes(client):
+    SP._hits.clear()
+    c = client
+    adm = await login(c, "admin@liga.com")
+    sid, sp, T = await _open(c, adm)
+    slug = sp["slug"]
+
+    # duas fichas para a cota de 1 vaga (pendentes não ocupam vaga): só uma pode ser aprovada
+    a = (await c.post(f"{API}/public/sponsor/{slug}", json=ficha(T["Gorila"], company="Alfa"))).json()["id"]
+    b = (await c.post(f"{API}/public/sponsor/{slug}", json=ficha(T["Gorila"], company="Beta"))).json()["id"]
+    assert (await c.patch(f"{API}/admin/sponsors/{a}", json={"status": "approved"}, headers=adm)).status_code == 200
+    r = await c.patch(f"{API}/admin/sponsors/{b}", json={"status": "approved"}, headers=adm)
+    assert r.status_code == 400 and "cheia" in r.json()["detail"]
+    # mover um aprovado para a cota cheia também é barrado
+    s = (await c.post(f"{API}/public/sponsor/{slug}", json=ficha(T["Sagui"], company="Sigma"))).json()["id"]
+    await c.patch(f"{API}/admin/sponsors/{s}", json={"status": "approved"}, headers=adm)
+    r = await c.patch(f"{API}/admin/sponsors/{s}", json={"tier_id": T["Gorila"]}, headers=adm)
+    assert r.status_code == 400
+
+    # logo de pendente não é pública (o painel usa o endpoint autenticado)
+    assert (await c.get(f"{API}/public/sponsors/{b}/logo")).status_code == 404
+    assert (await c.get(f"{API}/admin/sponsors/{b}/logo", headers=adm)).status_code == 200
+    assert (await c.get(f"{API}/admin/sponsors/{b}/logo")).status_code == 401
+
+    # trocar a logo muda a URL (fura o cache de 1 dia)
+    url1 = (await c.get(f"{API}/admin/seasons/{sid}/sponsors", headers=adm)).json()
+    url1 = next(x for x in url1 if x["id"] == a)["logo_url"]
+    r = await c.patch(f"{API}/admin/sponsors/{a}", json={"logo": other_png()}, headers=adm)
+    assert r.json()["logo_url"] != url1
+
+    # cota de outro torneio não serve
+    sid2, _, T2 = await _open(c, adm, "Outra Copa")
+    r = await c.patch(f"{API}/admin/sponsors/{s}", json={"tier_id": T2["Sagui"]}, headers=adm)
+    assert r.status_code == 404
+    r = await c.post(f"{API}/admin/seasons/{sid}/sponsors", headers=adm, json=ficha(T2["Sagui"]))
+    assert r.status_code == 404
+
+    # null em campo obrigatório da cota não derruba (ignora); null em vagas = sem limite
+    r = await c.patch(f"{API}/admin/tiers/{T['Sagui']}", json={"name": None, "weight": None}, headers=adm)
+    assert r.status_code == 200 and r.json()["name"] == "Sagui"
+
+    # instagram em forma de link
+    r = await c.patch(f"{API}/admin/sponsors/{s}", headers=adm,
+                      json={"instagram": "https://www.instagram.com/padaria/?igshid=x", "company": None})
+    assert r.status_code == 200 and r.json()["instagram"] == "padaria" and r.json()["company"] == "Sigma"
+
+
+async def test_limite_nao_se_burla_com_x_forwarded_for(client):
+    SP._hits.clear()
+    c = client
+    adm = await login(c, "admin@liga.com")
+    _, sp, T = await _open(c, adm)
+    codes = []
+    for i in range(7):  # o cliente forja o começo; o proxy acrescenta o IP real no fim
+        r = await c.post(f"{API}/public/sponsor/{sp['slug']}", json=ficha(T["Sagui"], company=f"E{i}"),
+                         headers={"X-Forwarded-For": f"10.0.0.{i}, 200.1.1.1"})
+        codes.append(r.status_code)
+    assert codes == [201] * 5 + [429] * 2

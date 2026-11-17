@@ -185,11 +185,18 @@ export class Monkey {
  * Personagem da turma que aparece ao lado da quadra (fora do jogo). Anda de perfil;
  * nas cenas, `forced` fixa uma pose (caído, deitado…).
  */
-export type BuddyKind = 'org' | 'andre'
+export type BuddyKind = 'org' | 'andre' | 'rennan'
 
 const BUDDY_FRAMES: Record<BuddyKind, { stand: SpriteName; walk: [SpriteName, SpriteName] }> = {
   org: { stand: 'buddyWalkB', walk: ['buddyWalkA', 'buddyWalkB'] },
   andre: { stand: 'andreStand', walk: ['andreWalkA', 'andreWalkB'] },
+  rennan: { stand: 'rennanFront', walk: ['rennanWalkA', 'rennanWalkB'] },
+}
+
+/** Onde fica a mão (coluna, linha da grade) — ponta do elástico do Rennan. */
+const HANDS: Partial<Record<SpriteName, [number, number]>> = {
+  rennanFront: [3, 14], rennanLow: [5, 13], rennanMid: [2, 4], rennanHigh: [3, 0],
+  rennanWalkA: [12, 9], rennanWalkB: [11, 8],
 }
 
 export class Buddy {
@@ -319,6 +326,8 @@ export class CourtEngine {
   /** balão de fala ativo (tenista ou personagem da turma) */
   speech: { text: string; from: number; until: number; who: 'player' | 'buddy' } | null = null
   sideBusy = false
+  /** elástico amarrado: ponto do nó (mundo); a outra ponta vai na mão do personagem */
+  band: { x: number; y: number } | null = null
   /** partículas de fumaça (x, y já na tela de arte, sem a área de overflow) */
   private puffs: { x: number; y: number; vx: number; vy: number; age: number; life: number; big: boolean }[] = []
   bottleOnBench = true
@@ -543,6 +552,22 @@ export class CourtEngine {
     this.side.step(dt)
   }
 
+  /** Linha de 1 pixel (Bresenham), para o elástico. */
+  private line(c: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number, color: string) {
+    x0 = Math.round(x0); y0 = Math.round(y0); x1 = Math.round(x1); y1 = Math.round(y1)
+    const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0)
+    const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1
+    let err = dx + dy
+    c.fillStyle = color
+    for (;;) {
+      c.fillRect(x0, y0, 1, 1)
+      if (x0 === x1 && y0 === y1) break
+      const e2 = 2 * err
+      if (e2 >= dy) { err += dy; x0 += sx }
+      if (e2 <= dx) { err += dx; y0 += sy }
+    }
+  }
+
   /** Fumaça: baforada (big) ou fiapo do cigarro. */
   puff(x: number, y: number, big: boolean) {
     const away = this.buddy.flip ? -1 : 1
@@ -562,6 +587,7 @@ export class CourtEngine {
       this.sideBusy = false
       this.buddy.leave()
       this.puffs = []
+      this.band = null
       this.nextSideAt = this.time + rand(this.sideGap[0], this.sideGap[1])
     }
   }
@@ -668,12 +694,22 @@ export class CourtEngine {
           b.fillStyle = this.colors.shadow
           b.fillRect(Math.round(bd.x) - (wide ? 12 : 5), O + Math.round(bd.y), wide ? 24 : 11, 1)
           this.blit(b, name, bd.x, O + bd.y, bd.flip)
+          const hand = HANDS[name]
+          if (this.band && hand) {
+            const h = bd.at(hand[0], hand[1])
+            this.line(b, this.band.x, O + this.band.y, h.x, O + h.y, '#c8f02a')
+          }
         },
       })
     }
 
     items.sort((a, c) => a.y - c.y)
     for (const it of items) it.draw()
+
+    if (this.band) {
+      b.fillStyle = '#c8f02a'
+      b.fillRect(Math.round(this.band.x) - 1, O + Math.round(this.band.y), 3, 2)
+    }
 
     // fumaça por cima dos personagens
     for (const p of this.puffs) {

@@ -347,13 +347,73 @@ function* andreSmokes(e: CourtEngine): Script {
   yield () => bd.arrived
 }
 
+/**
+ * Turma — Rennan: chega pela esquerda, amarra o elástico verde-limão no poste da rede,
+ * se afasta esticando e faz as repetições de ombro (punho do peito até acima da cabeça).
+ */
+function* rennanBand(e: CourtEngine): Script {
+  const g = e.geo
+  const bd = e.buddy
+  const y = 15
+  const knot = { x: g.postL - 1, y: 6 }
+  const tieX = g.postL - 5
+  const workX = Math.max(9, g.postL - 13)
+  bd.enter(-12, y, 'rennan')
+  bd.moveTo(tieX, 24)
+  yield () => bd.arrived
+
+  // amarra no poste
+  for (let i = 0; i < 4; i++) {
+    bd.forced = i % 2 ? 'rennanWalkA' : 'rennanWalkB'
+    yield 0.3
+  }
+  e.band = knot
+  bd.forced = null
+  yield 0.4
+
+  // afasta esticando o elástico e vira de frente
+  bd.moveTo(workX, 14)
+  yield () => bd.arrived
+  bd.flip = false
+  bd.forced = 'rennanLow'
+  yield 0.6
+
+  // repetições, no ritmo do vídeo
+  const reps = Math.floor(rand(8, 12))
+  for (let i = 0; i < reps; i++) {
+    bd.forced = 'rennanMid'
+    yield 0.14
+    bd.forced = 'rennanHigh'
+    yield rand(0.3, 0.4)
+    bd.forced = 'rennanMid'
+    yield 0.14
+    bd.forced = 'rennanLow'
+    yield rand(0.25, 0.35)
+  }
+  bd.forced = 'rennanFront'
+  yield 0.8
+
+  // desamarra e vai embora
+  bd.forced = null
+  bd.moveTo(tieX, 24)
+  yield () => bd.arrived
+  bd.forced = 'rennanWalkB'
+  yield 0.6
+  e.band = null
+  bd.forced = null
+  bd.moveTo(-12, 26)
+  yield () => bd.arrived
+}
+
 export const SCENES: SceneDef[] = [
   { id: 'rally', track: 'main', weight: 5, run: rally },
   { id: 'serve', track: 'main', weight: 2, run: serveAndRally },
   { id: 'monkey-ball', track: 'main', weight: 3, monkey: true, run: monkeyStealsBall },
   { id: 'monkey-poop', track: 'main', weight: 10, monkey: true, run: monkeyPoop },
-  { id: 'monkey-watch', track: 'ambient', weight: 1, run: monkeyWatches },
+  // não senta no poste enquanto alguém da turma está por ali (ex.: o elástico do Rennan)
+  { id: 'monkey-watch', track: 'ambient', weight: 1, when: (e) => !e.sideBusy, run: monkeyWatches },
   { id: 'caimbra', track: 'side', weight: 1, run: cramp },
   { id: 'andre', track: 'side', weight: 1, run: andreSmokes },
+  { id: 'rennan', track: 'side', weight: 1, when: (e) => e.geo.postL > 22, run: rennanBand },
   { id: 'monkey-bottle', track: 'ambient', weight: 1, when: (e) => !!e.geo.bench && e.bottleOnBench, run: monkeyBottle },
 ]

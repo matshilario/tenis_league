@@ -102,6 +102,13 @@ async def test_patrocinio_completo(client, sent):
     await c.patch(f"{API}/admin/sponsors/{zid}", json={"visible_until": "2020-01-01"}, headers=adm)
     assert (await c.get(f"{API}/public/sponsors/active")).json() == []
 
+    # recusar e reaprovar: prazo vencido recomeça pela cota e volta ao site
+    await c.patch(f"{API}/admin/sponsors/{zid}", json={"status": "rejected"}, headers=adm)
+    r = await c.patch(f"{API}/admin/sponsors/{zid}", json={"status": "approved"}, headers=adm)
+    assert r.status_code == 200 and date.fromisoformat(r.json()["visible_until"]) > date.today()
+    act = (await c.get(f"{API}/public/sponsors/active")).json()
+    assert [a["company"] for a in act] == ["Ferragens Zé"]
+
     # cartão de resultado (público) leva as logos do torneio
     r = await c.post(f"{API}/admin/categories/{cat_id}/draw", json={"start_date": str(date.today())},
                      headers=adm)

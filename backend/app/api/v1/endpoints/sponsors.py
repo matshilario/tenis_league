@@ -401,7 +401,10 @@ async def patch_sponsor(sponsor_id: uuid.UUID, body: SponsorPatch, user: Admin, 
             if not sp.logo:
                 raise _bad("Sem logo ainda: envie a logo antes de aprovar.")
             sp.approved_at = utcnow()
-            if not sp.visible_until:
+            # prazo vazio ou já vencido (reaprovação) recomeça pela cota,
+            # a menos que o admin tenha mandado a data nesta mesma requisição
+            if "visible_until" not in data and (not sp.visible_until
+                                                or sp.visible_until < date.today()):
                 days = sp.tier.visibility_days if sp.tier else 60
                 sp.visible_until = date.today() + timedelta(days=days)
             season = await db.get(Season, sp.season_id)

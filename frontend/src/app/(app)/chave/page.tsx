@@ -14,7 +14,7 @@ export default function BracketPage() {
       <PageHeader eyebrow="Mata-mata" title="Semifinais e final">
         <CategoryPicker categories={categories} value={categoryId} onChange={choose} />
       </PageHeader>
-      <Bracket matches={detail.data.matches} champion={detail.data.champion} />
+      <Bracket matches={detail.data.matches} champion={detail.data.champion} categoryId={detail.data.category.id} />
       <p className="text-xs text-muted-foreground">
         {detail.data.category.n_groups === 2
           ? 'Cruzamento: 1º do A × 2º do B e 1º do B × 2º do A.'

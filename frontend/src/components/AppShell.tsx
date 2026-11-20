@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils'
 import { Brand } from './Brand'
 import { CourtStrip } from './court/CourtStrip'
 import { Icon } from './Icon'
+import { SponsorBar } from './sponsors/SponsorLogos'
 import { Modal } from './ui'
 
 type Item = { href: string; label: string; short?: string; icon: IconName }
@@ -68,6 +69,7 @@ export function AppShell({ user, children }: { user: User; children: React.React
       <main id="conteudo" className="mx-auto max-w-6xl px-4 pt-6"
         style={{ paddingBottom: 'calc(var(--court-h, 0px) + var(--nav-h) + 3.5rem)' }}>
         {children}
+        <SponsorBar className="mt-12" />
       </main>
 
       <CourtStrip />

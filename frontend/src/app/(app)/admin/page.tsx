@@ -1,12 +1,14 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
+import { useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 import { AuditTab } from '@/components/admin/AuditTab'
 import { InvitesTab } from '@/components/admin/InvitesTab'
 import { MatchesTab } from '@/components/admin/MatchesTab'
 import { MembersTab } from '@/components/admin/MembersTab'
 import { SeasonTab } from '@/components/admin/SeasonTab'
+import { SponsorTab } from '@/components/admin/SponsorTab'
 import { PageHeader } from '@/components/PageHeader'
 import { Card } from '@/components/ui'
 import { api } from '@/lib/api'
@@ -18,13 +20,15 @@ const TABS = [
   { id: 'invites', label: 'Convites' },
   { id: 'season', label: 'Temporada' },
   { id: 'matches', label: 'Partidas' },
+  { id: 'patrocinio', label: 'Patrocínio' },
   { id: 'audit', label: 'Histórico' },
 ] as const
 type Tab = (typeof TABS)[number]['id']
 
 export default function AdminPage() {
   const me = useMe()
-  const [tab, setTab] = useState<Tab>('members')
+  const aba = useSearchParams().get('aba')
+  const [tab, setTab] = useState<Tab>(TABS.some((t) => t.id === aba) ? (aba as Tab) : 'members')
   const pendingUsers = useQuery({ queryKey: ['admin-users', 'pending'], queryFn: () => api.admin.users('pending'),
     enabled: me.data?.role === 'admin' })
   const pendingMatches = useQuery({ queryKey: ['admin-pending-matches'], queryFn: api.admin.pendingMatches,
@@ -52,6 +56,7 @@ export default function AdminPage() {
       {tab === 'invites' && <InvitesTab />}
       {tab === 'season' && <SeasonTab />}
       {tab === 'matches' && <MatchesTab />}
+      {tab === 'patrocinio' && <SponsorTab />}
       {tab === 'audit' && <AuditTab />}
     </div>
   )

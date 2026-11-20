@@ -268,3 +268,166 @@ class AuditOut(ORM):
     details: dict | None
     created_at: datetime
     actor_id: uuid.UUID | None
+
+
+# ------------------------------------------------------------------ patrocínio
+class TierIn(BaseModel):
+    name: str = Field(min_length=2, max_length=60)
+    tagline: str | None = Field(default=None, max_length=160)
+    price_cents: int = Field(ge=0, le=100_000_000)
+    slots: int | None = Field(default=None, ge=1, le=500)
+    visibility_days: int = Field(default=60, ge=1, le=730)
+    perks: list[str] = Field(default_factory=list, max_length=10)
+    weight: int = Field(default=1, ge=1, le=3)
+    sort: int = 0
+
+
+class TierPatch(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=60)
+    tagline: str | None = Field(default=None, max_length=160)
+    price_cents: int | None = Field(default=None, ge=0, le=100_000_000)
+    slots: int | None = Field(default=None, ge=1, le=500)
+    unlimited: bool | None = None  # true zera o limite de vagas
+    visibility_days: int | None = Field(default=None, ge=1, le=730)
+    perks: list[str] | None = Field(default=None, max_length=10)
+    weight: int | None = Field(default=None, ge=1, le=3)
+    sort: int | None = None
+
+
+class TierOut(ORM):
+    id: uuid.UUID
+    name: str
+    tagline: str | None
+    price_cents: int
+    slots: int | None
+    visibility_days: int
+    perks: list[str] | None
+    weight: int
+    sort: int
+    taken: int = 0
+    available: bool = True
+
+
+class SponsorshipIn(BaseModel):
+    open: bool | None = None
+    pitch: str | None = Field(default=None, max_length=2000)
+    payment: str | None = Field(default=None, max_length=2000)
+
+
+class SponsorshipOut(BaseModel):
+    season_id: uuid.UUID
+    season_name: str
+    open: bool
+    slug: str | None
+    url: str | None
+    pitch: str | None
+    payment: str | None
+    tiers: list[TierOut]
+
+
+class SponsorIn(BaseModel):
+    tier_id: uuid.UUID
+    company: str = Field(min_length=2, max_length=120)
+    contact_name: str = Field(min_length=2, max_length=120)
+    phone: str = Field(min_length=8, max_length=30)
+    email: EmailStr | None = None
+    website: str | None = Field(default=None, max_length=255)
+    instagram: str | None = Field(default=None, max_length=80)
+    message: str | None = Field(default=None, max_length=1000)
+    logo: str | None = Field(default=None, max_length=2_200_000)  # data URL (PNG/JPEG)
+
+
+class SponsorPatch(BaseModel):
+    status: str | None = None
+    tier_id: uuid.UUID | None = None
+    visible_until: date | None = None
+    company: str | None = Field(default=None, min_length=2, max_length=120)
+    website: str | None = Field(default=None, max_length=255)
+    instagram: str | None = Field(default=None, max_length=80)
+    logo: str | None = Field(default=None, max_length=2_200_000)
+
+
+class SponsorOut(ORM):
+    id: uuid.UUID
+    season_id: uuid.UUID
+    tier_id: uuid.UUID | None
+    tier_name: str | None = None
+    company: str
+    contact_name: str
+    phone: str | None
+    email: str | None
+    website: str | None
+    instagram: str | None
+    message: str | None
+    status: str
+    approved_at: datetime | None
+    visible_until: date | None
+    created_at: datetime
+    logo_url: str | None = None
+
+
+class PublicSponsor(BaseModel):
+    id: uuid.UUID
+    company: str
+    website: str | None
+    instagram: str | None
+    tier_name: str | None
+    weight: int
+    logo_url: str | None
+
+
+class SponsorPageCategory(BaseModel):
+    name: str
+    phase: str
+    players: int
+    start_date: date | None
+    final_date: date | None
+    champion: str | None
+
+
+class SponsorPage(BaseModel):
+    season_name: str
+    open: bool
+    pitch: str | None
+    players: int
+    matches_played: int
+    categories: list[SponsorPageCategory]
+    tiers: list[TierOut]
+    sponsors: list[PublicSponsor]
+
+
+class SponsorSubmitted(BaseModel):
+    id: uuid.UUID
+    payment: str | None
+
+
+class ChampionCard(BaseModel):
+    season: str
+    category: str
+    champion: str
+    runner_up: str | None
+    score: str | None
+    sets: list[list[int]] = []          # na visão do campeão
+    tiebreaks: list[list[int] | None] = []   # pontos do tie-break de cada set (ou None)
+    super_tiebreak: list[int] | None = None
+    stb_awarded: bool = False
+    result_type: str | None = None
+    played_on: date | None = None
+    sponsors: list[PublicSponsor]
+
+
+class MatchCard(BaseModel):
+    season: str
+    category: str
+    stage: str
+    player1: str
+    player2: str
+    winner_side: int | None
+    score: str
+    sets: list[list[int]] = []          # na visão jogador1 × jogador2
+    tiebreaks: list[list[int] | None] = []   # pontos do tie-break de cada set (ou None)
+    super_tiebreak: list[int] | None = None
+    stb_awarded: bool = False
+    result_type: str | None = None
+    played_on: date | None
+    sponsors: list[PublicSponsor]

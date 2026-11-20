@@ -8,6 +8,7 @@ from datetime import date, datetime, timezone
 from sqlalchemy import (
     JSON,
     Boolean,
+    LargeBinary,
     Date,
     DateTime,
     ForeignKey,
@@ -132,6 +133,11 @@ class Season(Base):
     name: Mapped[str] = mapped_column(String(120))
     announcement: Mapped[str | None] = mapped_column(Text, nullable=True)  # comunicado
     is_current: Mapped[bool] = mapped_column(Boolean, default=True)
+    # patrocínio: link público /patrocine/<slug>, aberto ou não, textos da organização
+    sponsor_slug: Mapped[str | None] = mapped_column(String(40), unique=True, nullable=True)
+    sponsor_open: Mapped[bool] = mapped_column(Boolean, default=False)
+    sponsor_pitch: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sponsor_payment: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = _created()
 
     categories: Mapped[list["Category"]] = relationship(
@@ -236,3 +242,55 @@ class AuditLog(Base):
     summary: Mapped[str] = mapped_column(Text)
     details: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = _created()
+
+
+class SponsorStatus:
+    PENDING = "pending"      # ficha enviada, aguardando a organização (pagamento etc.)
+    APPROVED = "approved"    # logo no site e nos cartões até visible_until
+    REJECTED = "rejected"
+
+
+class SponsorTier(Base):
+    """Cota de patrocínio de um torneio (temporada)."""
+
+    __tablename__ = "sponsor_tiers"
+
+    id: Mapped[uuid.UUID] = _id()
+    season_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("seasons.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(60))
+    tagline: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    price_cents: Mapped[int] = mapped_column(Integer, default=0)
+    slots: Mapped[int | None] = mapped_column(Integer, nullable=True)  # None = sem limite
+    visibility_days: Mapped[int] = mapped_column(Integer, default=60)
+    perks: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # peso da logo: 3 = destaque (cartões grandes), 2 = médio, 1 = rodapé
+    weight: Mapped[int] = mapped_column(Integer, default=1)
+    sort: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = _created()
+
+
+class Sponsor(Base):
+    __tablename__ = "sponsors"
+
+    id: Mapped[uuid.UUID] = _id()
+    season_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("seasons.id", ondelete="CASCADE"), index=True)
+    tier_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("sponsor_tiers.id", ondelete="SET NULL"), nullable=True)
+    company: Mapped[str] = mapped_column(String(120))
+    contact_name: Mapped[str] = mapped_column(String(120))
+    phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    website: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    instagram: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    logo: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    logo_mime: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    logo_version: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default=SponsorStatus.PENDING)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    visible_until: Mapped[date | None] = mapped_column(Date, nullable=True)
+    created_at: Mapped[datetime] = _created()
+
+    tier: Mapped[SponsorTier | None] = relationship(lazy="joined")

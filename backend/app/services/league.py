@@ -543,8 +543,11 @@ async def propagate_knockout(db: AsyncSession, cat: Category, outbox: Outbox | N
         cat.champion_entry_id = champ
         cat.phase = Phase.FINISHED if champ else Phase.KNOCKOUT
         if champ and outbox:
+            from app.services.sponsors import approved_sponsors  # evita import circular
             e = await db.get(Entry, champ)
-            outbox.add(M.champion(cat.name, name_of(e)))
+            sps = [s.company for s in await approved_sponsors(db, cat.season_id, active_only=False)]
+            card = f"{settings.FRONTEND_URL.rstrip('/')}/compartilhar/campeao/{cat.id}"
+            outbox.add(M.champion(cat.name, name_of(e), sps, card))
     await db.flush()
 
 

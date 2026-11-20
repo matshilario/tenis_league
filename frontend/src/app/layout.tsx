@@ -15,6 +15,7 @@ const sans = Public_Sans({ subsets: ['latin'], variable: '--font-sans', display:
 const pixel = Silkscreen({ subsets: ['latin'], weight: ['400', '700'], variable: '--font-pixel', display: 'swap' })
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://duviscup.com.br'),
   title: { default: 'Duvis Cup', template: '%s · Duvis Cup' },
   description: 'A liga de tênis da nossa turma.',
 }

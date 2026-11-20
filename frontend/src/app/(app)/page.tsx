@@ -55,6 +55,12 @@ export default function Home() {
           </p>
           <RevealTitle text={d?.champion ? `${d.champion.display_name} é o campeão!` : `Bora pra quadra, ${first}?`}
             className="text-display font-bold text-ink dark:text-foreground" />
+          {d?.champion && (
+            <a href={`/compartilhar/campeao/${d.category.id}`} target="_blank" rel="noopener noreferrer"
+              className={buttonClass('accent', 'sm') + ' mt-4'}>
+              <Icon name="share" className="h-4 w-4" /> Compartilhar o cartão do campeão
+            </a>
+          )}
         </div>
         <CategoryPicker categories={categories} value={categoryId} onChange={choose} />
       </div>

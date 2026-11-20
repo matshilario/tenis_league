@@ -222,6 +222,7 @@ export interface ChampionCard {
   season: string; category: string; champion: string
   runner_up: string | null; score: string | null
   sets: number[][]; super_tiebreak: number[] | null; result_type: string | null
+  tiebreaks?: (number[] | null)[]; stb_awarded?: boolean
   played_on: string | null; sponsors: PublicSponsor[]
 }
 
@@ -229,5 +230,6 @@ export interface MatchCardData {
   season: string; category: string; stage: string
   player1: string; player2: string; winner_side: number | null
   score: string; sets: number[][]; super_tiebreak: number[] | null; result_type: string | null
+  tiebreaks?: (number[] | null)[]; stb_awarded?: boolean
   played_on: string | null; sponsors: PublicSponsor[]
 }

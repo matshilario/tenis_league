@@ -12,6 +12,7 @@ from datetime import date
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import defer
 
 from app.models import Season, Sponsor, SponsorStatus, SponsorTier
 from app.schemas import PublicSponsor, TierOut
@@ -43,7 +44,16 @@ class SponsorError(ValueError):
 def slugify(text: str) -> str:
     t = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode().lower()
     t = re.sub(r"[^a-z0-9]+", "-", t).strip("-")
-    return (t[:24].strip("-") or "torneio") + "-" + secrets.token_hex(2)
+    return (t[:24].strip("-") or "torneio") + "-" + secrets.token_hex(3)
+
+
+async def unique_slug(db: AsyncSession, name: str) -> str:
+    """slugify + confere no banco (evita estourar a unique constraint com 500)."""
+    for _ in range(10):
+        slug = slugify(name)
+        if not await db.scalar(select(Season.id).where(Season.sponsor_slug == slug)):
+            return slug
+    raise SponsorError("Não consegui gerar um link novo; tenta de novo.")
 
 
 def decode_logo(data_url: str) -> tuple[bytes, str]:
@@ -61,12 +71,16 @@ def decode_logo(data_url: str) -> tuple[bytes, str]:
     raise SponsorError("A logo precisa ser PNG ou JPEG.")
 
 
-def logo_url(s: Sponsor) -> str | None:
-    if not s.logo:
-        return None
+def set_logo(s: Sponsor, data_url: str) -> None:
+    s.logo, s.logo_mime = decode_logo(data_url)
     # versão = conteúdo da logo: trocar a logo muda a URL (o endpoint tem cache de 1 dia)
-    v = format(zlib.crc32(s.logo), "x")
-    return f"/api/v1/public/sponsors/{s.id}/logo?v={v}"
+    s.logo_version = format(zlib.crc32(s.logo), "x")
+
+
+def logo_url(s: Sponsor) -> str | None:
+    if not s.logo_version:
+        return None
+    return f"/api/v1/public/sponsors/{s.id}/logo?v={s.logo_version}"
 
 
 def public_sponsor(s: Sponsor) -> PublicSponsor:
@@ -109,7 +123,7 @@ async def approved_sponsors(db: AsyncSession, season_id: uuid.UUID | None = None
     `season_id`: só os daquele torneio (cartões); None = todos (faixa do site).
     `active_only`: respeita o prazo de exibição no site (visible_until).
     """
-    q = select(Sponsor).where(Sponsor.status == SponsorStatus.APPROVED)
+    q = select(Sponsor).options(defer(Sponsor.logo)).where(Sponsor.status == SponsorStatus.APPROVED)
     if season_id is not None:
         q = q.where(Sponsor.season_id == season_id)
     if active_only:

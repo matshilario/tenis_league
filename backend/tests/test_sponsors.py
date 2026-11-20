@@ -219,3 +219,47 @@ async def test_limite_nao_se_burla_com_x_forwarded_for(client):
                          headers={"X-Forwarded-For": f"10.0.0.{i}, 200.1.1.1"})
         codes.append(r.status_code)
     assert codes == [201] * 5 + [429] * 2
+
+
+async def test_ficha_recusada_nao_gasta_limite_e_teto_global_so_silencia(client, sent):
+    SP._hits.clear()
+    c = client
+    adm = await login(c, "admin@liga.com")
+    _, sp, T = await _open(c, adm)
+    url = f"{API}/public/sponsor/{sp['slug']}"
+    # fichas inválidas (logo ruim) não contam para o limite do IP
+    for _ in range(6):
+        assert (await c.post(url, json=ficha(T["Sagui"], logo="data:image/png;base64,AAAA"))).status_code == 400
+    assert (await c.post(url, json=ficha(T["Sagui"], company="Real"))).status_code == 201
+
+    # teto global estourado (spam de vários IPs): a ficha é salva, só não avisa no WhatsApp
+    SP._hits["*"].extend([SP.time.monotonic()] * SP.GLOBAL_LIMIT)
+    sent.clear()
+    r = await c.post(url, json=ficha(T["Sagui"], company="Empresa Legítima"),
+                     headers={"X-Forwarded-For": "9.9.9.9"})
+    assert r.status_code == 201 and not any("Empresa Legítima" in s for s in sent)
+    names = [s["company"] for s in (await c.get(f"{API}/admin/seasons/{sp['season_id']}/sponsors",
+                                                headers=adm)).json()]
+    assert "Empresa Legítima" in names
+
+
+async def test_cota_com_ficha_pendente_nao_some(client):
+    SP._hits.clear()
+    c = client
+    adm = await login(c, "admin@liga.com")
+    _, sp, T = await _open(c, adm)
+    pid = (await c.post(f"{API}/public/sponsor/{sp['slug']}", json=ficha(T["Gorila"]))).json()["id"]
+    r = await c.delete(f"{API}/admin/tiers/{T['Gorila']}", headers=adm)
+    assert r.status_code == 400 and "pendente" in r.json()["detail"]
+    # recusada libera a cota; e sem cota não se aprova
+    await c.patch(f"{API}/admin/sponsors/{pid}", json={"status": "rejected"}, headers=adm)
+    assert (await c.delete(f"{API}/admin/tiers/{T['Gorila']}", headers=adm)).status_code == 200
+    r = await c.patch(f"{API}/admin/sponsors/{pid}", json={"status": "approved"}, headers=adm)
+    assert r.status_code == 400 and "cota" in r.json()["detail"]
+
+
+async def test_cartao_mostra_tiebreak():
+    out = SP._sets({"sets": [[7, 6], [4, 6]], "tiebreaks": [[7, 5], None],
+                    "super_tiebreak": None, "stb_awarded": True}, flip=True)
+    assert out == {"sets": [[6, 7], [6, 4]], "tiebreaks": [[5, 7], None],
+                   "super_tiebreak": None, "stb_awarded": True}

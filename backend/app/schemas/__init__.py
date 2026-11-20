@@ -408,7 +408,9 @@ class ChampionCard(BaseModel):
     runner_up: str | None
     score: str | None
     sets: list[list[int]] = []          # na visão do campeão
+    tiebreaks: list[list[int] | None] = []   # pontos do tie-break de cada set (ou None)
     super_tiebreak: list[int] | None = None
+    stb_awarded: bool = False
     result_type: str | None = None
     played_on: date | None = None
     sponsors: list[PublicSponsor]
@@ -423,7 +425,9 @@ class MatchCard(BaseModel):
     winner_side: int | None
     score: str
     sets: list[list[int]] = []          # na visão jogador1 × jogador2
+    tiebreaks: list[list[int] | None] = []   # pontos do tie-break de cada set (ou None)
     super_tiebreak: list[int] | None = None
+    stb_awarded: bool = False
     result_type: str | None = None
     played_on: date | None
     sponsors: list[PublicSponsor]

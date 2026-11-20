@@ -84,8 +84,10 @@ function Pill({ children, size = 20 }: { children: string; size?: number }) {
 }
 
 /** Sets lado a lado, estilo placar de transmissão: "7–6  6–4", games do vencedor do set em lima. */
-function SetLine({ sets, stb, size }: { sets: number[][]; stb?: number[] | null; size: number }) {
-  const all = [...sets.map((s) => ({ a: s[0], b: s[1], tb: false })), ...(stb ? [{ a: stb[0], b: stb[1], tb: true }] : [])]
+function SetLine({ sets, stb, tbs, awarded, size }: { sets: number[][]; stb?: number[] | null;
+  tbs?: (number[] | null)[]; awarded?: boolean; size: number }) {
+  const all = [...sets.map((s, i) => ({ a: s[0], b: s[1], tb: false, pts: tbs?.[i] ? Math.min(...tbs[i]!) : null })),
+    ...(stb ? [{ a: stb[0], b: stb[1], tb: true, pts: null }] : [])]
   return (
     <div style={{ display: 'flex', alignItems: 'baseline', gap: size * 0.55 }}>
       {all.map((s, i) => (
@@ -96,8 +98,10 @@ function SetLine({ sets, stb, size }: { sets: number[][]; stb?: number[] | null;
           <span style={{ color: C.faint, fontWeight: 500 }}>–</span>
           <span style={{ color: s.b > s.a ? C.lime : C.paper }}>{String(s.b)}</span>
           {s.tb ? <span style={{ color: C.muted, fontWeight: 500 }}>]</span> : null}
+          {s.pts != null ? <span style={{ color: C.muted, fontWeight: 500, fontSize: size * 0.45 }}>({String(s.pts)})</span> : null}
         </div>
       ))}
+      {awarded && !stb ? <span style={{ color: C.muted, fontFamily: 'Public Sans', fontWeight: 600, fontSize: size * 0.4 }}>[STB]</span> : null}
     </div>
   )
 }
@@ -155,7 +159,7 @@ export async function championImage(card: ChampionCard, size: Size, opts: { plac
           </div>
           {sets.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 34 }}>
-              <SetLine sets={sets} stb={card.super_tiebreak} size={58} />
+              <SetLine sets={sets} stb={card.super_tiebreak} tbs={card.tiebreaks} awarded={card.stb_awarded} size={58} />
               {final && <div style={{ display: 'flex', fontSize: 24, color: C.muted }}>{final}</div>}
             </div>
           )}
@@ -177,7 +181,7 @@ export async function championImage(card: ChampionCard, size: Size, opts: { plac
         </div>
         {sets.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 20 }}>
-            <SetLine sets={sets} stb={card.super_tiebreak} size={40} />
+            <SetLine sets={sets} stb={card.super_tiebreak} tbs={card.tiebreaks} awarded={card.stb_awarded} size={40} />
             {final && <div style={{ display: 'flex', fontSize: 19, color: C.muted }}>{final}</div>}
           </div>
         )}
@@ -196,6 +200,10 @@ function Board({ card, k }: { card: MatchCardData; k: number }) {
     const name = side === 0 ? card.player1 : card.player2
     const win = card.winner_side === side + 1
     const vals = [...sets.map((s) => s[side]), ...(stb ? [stb[side]] : [])]
+    const tbPts = (i: number) => {
+      const t = card.tiebreaks?.[i], s = sets[i]
+      return t && s && s[side] < s[1 - side] ? t[side] : null
+    }
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 24 * k, padding: `${14 * k}px 0`,
         borderTop: side ? `2px solid ${C.faint}` : '0px solid transparent' }}>
@@ -205,8 +213,14 @@ function Board({ card, k }: { card: MatchCardData; k: number }) {
           lineHeight: 1, color: win ? C.paper : C.muted, letterSpacing: -1 }}>{name}</div>
         {vals.map((v, i) => (
           <div key={i} style={{ display: 'flex', justifyContent: 'center', width: 62 * k, fontFamily: 'Fraunces', fontWeight: 700,
-            fontSize: (stb && i === vals.length - 1 ? 40 : 58) * k, color: win ? C.lime : C.muted }}>{String(v)}</div>
+            fontSize: (stb && i === vals.length - 1 ? 40 : 58) * k, color: win ? C.lime : C.muted }}>
+            {String(v)}{tbPts(i) != null ? <span style={{ fontSize: 26 * k, fontWeight: 500 }}>{String(tbPts(i))}</span> : null}
+          </div>
         ))}
+        {card.stb_awarded && !stb ? (
+          <div style={{ display: 'flex', justifyContent: 'center', width: 62 * k, fontFamily: 'Public Sans', fontWeight: 600,
+            fontSize: 22 * k, color: C.muted }}>{win ? 'STB' : ''}</div>
+        ) : null}
       </div>
     )
   }

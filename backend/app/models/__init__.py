@@ -287,6 +287,7 @@ class Sponsor(Base):
     message: Mapped[str | None] = mapped_column(Text, nullable=True)
     logo: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     logo_mime: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    logo_version: Mapped[str | None] = mapped_column(String(16), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default=SponsorStatus.PENDING)
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     visible_until: Mapped[date | None] = mapped_column(Date, nullable=True)

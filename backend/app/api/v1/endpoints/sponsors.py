@@ -8,11 +8,12 @@ from datetime import date, timedelta
 
 from fastapi import APIRouter, HTTPException, Request, Response
 from sqlalchemy import func, select
+from sqlalchemy.orm import defer
 
 from app.api.deps import DB, Admin, OutboxDep
 from app.core.config import settings
 from app.domain.phone import PhoneError, normalize_phone
-from app.domain.scoring import format_score
+from app.domain.scoring import format_score, normalize_score
 from app.models import (
     Category,
     Entry,
@@ -72,10 +73,15 @@ def _client_ip(request: Request) -> str:
     return xff[-1] if xff else (request.client.host if request.client else "?")
 
 
-def _throttle(request: Request, limit: int = 5, window: int = 3600) -> None:
-    """Fichas públicas: no máximo `limit` por IP e GLOBAL_LIMIT no total, por hora
-    (cada ficha manda WhatsApp para a organização)."""
-    now = time.monotonic()
+IP_LIMIT, WINDOW = 5, 3600
+
+
+def _throttle(request: Request) -> tuple[str, bool]:
+    """Fichas públicas: no máximo IP_LIMIT por IP por hora. Devolve (ip, avisar):
+    acima de GLOBAL_LIMIT no total a ficha ainda é salva (empresa de verdade não fica
+    travada por spam de vários IPs), só não manda WhatsApp para a organização.
+    Contador em memória: vale por processo e zera a cada deploy (1 réplica na Railway)."""
+    now, window = time.monotonic(), WINDOW
     for key in list(_hits):  # limpa janelas vencidas (o dicionário não cresce sem limite)
         q = _hits[key]
         while q and now - q[0] > window:
@@ -83,8 +89,14 @@ def _throttle(request: Request, limit: int = 5, window: int = 3600) -> None:
         if not q:
             del _hits[key]
     ip = _client_ip(request)
-    if len(_hits.get(ip, ())) >= limit or len(_hits.get("*", ())) >= GLOBAL_LIMIT:
+    if len(_hits.get(ip, ())) >= IP_LIMIT:
         raise HTTPException(429, "Muitas fichas seguidas. Tenta de novo mais tarde.")
+    return ip, len(_hits.get("*", ())) < GLOBAL_LIMIT
+
+
+def _count_hit(ip: str) -> None:
+    """Só conta ficha que foi de fato salva."""
+    now = time.monotonic()
     _hits[ip].append(now)
     _hits["*"].append(now)
 
@@ -102,9 +114,14 @@ async def sponsor_page(slug: str, db: DB):
     season = await _season_by_slug(db, slug)
     cats = list((await db.execute(select(Category).where(Category.season_id == season.id)
                                   .order_by(Category.created_at))).scalars())
+    by_cat: dict[uuid.UUID, list[Entry]] = defaultdict(list)
+    if cats:
+        res = await db.execute(select(Entry).where(Entry.category_id.in_([c.id for c in cats])))
+        for e in res.scalars().unique():
+            by_cat[e.category_id].append(e)
     out_cats, players = [], set()
     for c in cats:
-        entries = await L.get_entries(db, c)
+        entries = by_cat[c.id]
         active = [e for e in entries if e.status != EntryStatus.WITHDRAWN]
         players.update(e.user_id for e in active)
         champ = next((e.user.display_name for e in entries if e.id == c.champion_entry_id), None)
@@ -127,6 +144,7 @@ async def sponsor_page(slug: str, db: DB):
 async def sponsor_submit(slug: str, body: SponsorIn, request: Request, db: DB,
                          outbox: OutboxDep):
     season = await _season_by_slug(db, slug)
+    ip, notify = _throttle(request)
     if not season.sponsor_open:
         raise _bad("As cotas deste torneio estão fechadas no momento.")
     tier = await db.get(SponsorTier, body.tier_id)
@@ -144,18 +162,18 @@ async def sponsor_submit(slug: str, body: SponsorIn, request: Request, db: DB,
                  instagram=_insta(body.instagram), message=_clean(body.message))
     if body.logo:
         try:
-            sp.logo, sp.logo_mime = S.decode_logo(body.logo)
+            S.set_logo(sp, body.logo)
         except S.SponsorError as exc:
             raise _bad(str(exc))
-    _throttle(request)
     db.add(sp)
     await db.flush()
+    _count_hit(ip)
     # avisa a organização em privado (nunca o número digitado no formulário)
     admins = (await db.execute(select(User).where(User.role == Role.ADMIN,
                                                   User.status == UserStatus.APPROVED))).scalars()
     text = M.sponsor_submitted(sp.company, tier.name, sp.contact_name, phone,
                                f"{settings.FRONTEND_URL.rstrip('/')}/admin?aba=patrocinio")
-    for a in admins:
+    for a in admins if notify else ():
         if a.phone:
             outbox.add(text, number=a.phone)
     return SponsorSubmitted(id=sp.id, payment=season.sponsor_payment)
@@ -188,26 +206,30 @@ async def champion_card(category_id: uuid.UUID, db: DB):
     season = await db.get(Season, cat.season_id)
     champ = await db.get(Entry, cat.champion_entry_id)
     final = (await L.get_matches(db, cat, Stage.FINAL) or [None])[0]
-    runner, score, sets, stb, rt, played = None, None, [], None, None, None
+    runner, score, sets, rt, played = None, None, {}, None, None
     if final and final.winner_side:
         loser = final.entry2 if final.winner_side == 1 else final.entry1
         runner = L.name_of(loser) if loser else None
         score = format_score(final.score, final.result_type or "normal") if final.score else None
-        sets, stb = _sets(final.score, flip=final.winner_side == 2)
+        sets = _sets(final.score, flip=final.winner_side == 2)
         rt, played = final.result_type, final.played_on
     return ChampionCard(season=season.name, category=cat.name, champion=L.name_of(champ),
-                        runner_up=runner, score=score, sets=sets, super_tiebreak=stb,
+                        runner_up=runner, score=score, **sets,
                         result_type=rt, played_on=played,
                         sponsors=await _card_sponsors(db, season.id))
 
 
-def _sets(score: dict | None, flip: bool) -> tuple[list[list[int]], list[int] | None]:
-    """Sets e super tie-break do placar; `flip` inverte para a visão do outro lado."""
+def _sets(score: dict | None, flip: bool) -> dict:
+    """Sets, tie-breaks e super tie-break do placar (campos do cartão);
+    `flip` inverte para a visão do outro lado."""
     if not score:
-        return [], None
+        return {}
+    sc = normalize_score(score)
     f = (lambda p: [p[1], p[0]]) if flip else (lambda p: list(p))
-    stb = score.get("super_tiebreak")
-    return [f(s) for s in score.get("sets") or []], (f(stb) if stb else None)
+    return dict(sets=[f(s) for s in sc["sets"]],
+                tiebreaks=[f(t) if t else None for t in sc["tiebreaks"]],
+                super_tiebreak=f(sc["super_tiebreak"]) if sc["super_tiebreak"] else None,
+                stb_awarded=sc["stb_awarded"])
 
 
 @public.get("/cards/match/{match_id}", response_model=MatchCard)
@@ -221,7 +243,7 @@ async def match_card(match_id: uuid.UUID, db: DB):
                      player1=L.name_of(m.entry1), player2=L.name_of(m.entry2),
                      winner_side=m.winner_side,
                      score=format_score(m.score, m.result_type or "normal"),
-                     sets=_sets(m.score, False)[0], super_tiebreak=_sets(m.score, False)[1],
+                     **_sets(m.score, False),
                      result_type=m.result_type,
                      played_on=m.played_on, sponsors=await _card_sponsors(db, season.id))
 
@@ -269,7 +291,7 @@ async def set_sponsorship(season_id: uuid.UUID, body: SponsorshipIn, user: Admin
         season.sponsor_open = body.open
         if body.open:
             if not season.sponsor_slug:
-                season.sponsor_slug = S.slugify(season.name)
+                season.sponsor_slug = await S.unique_slug(db, season.name)
             await S.ensure_default_tiers(db, season)
     if body.pitch is not None:
         season.sponsor_pitch = _clean(body.pitch)
@@ -284,7 +306,8 @@ async def set_sponsorship(season_id: uuid.UUID, body: SponsorshipIn, user: Admin
 async def new_link(season_id: uuid.UUID, user: Admin, db: DB):
     """Gera outro link (o antigo para de funcionar)."""
     season = await _season(db, season_id)
-    season.sponsor_slug = S.slugify(season.name)
+    season.sponsor_slug = await S.unique_slug(db, season.name)
+    await L.audit(db, user, "sponsorship", f"Novo link de patrocínio de {season.name}")
     await db.flush()
     return await _sponsorship(db, season)
 
@@ -325,16 +348,18 @@ async def patch_tier(tier_id: uuid.UUID, body: TierPatch, user: Admin, db: DB):
 async def delete_tier(tier_id: uuid.UUID, user: Admin, db: DB):
     t = await _tier(db, tier_id)
     used = await db.scalar(select(func.count()).select_from(Sponsor).where(
-        Sponsor.tier_id == t.id, Sponsor.status == SponsorStatus.APPROVED))
+        Sponsor.tier_id == t.id, Sponsor.status != SponsorStatus.REJECTED))
     if used:
-        raise _bad("Essa cota tem patrocinador aprovado; mude a cota dele antes.")
+        raise _bad("Essa cota tem patrocinador aprovado ou ficha pendente; mude a cota dele antes.")
+    await L.audit(db, user, "tier_delete", f"Cota {t.name} removida")
     await db.delete(t)
     return {"ok": True}
 
 
 @admin.get("/seasons/{season_id}/sponsors", response_model=list[SponsorOut])
 async def list_sponsors(season_id: uuid.UUID, user: Admin, db: DB):
-    res = await db.execute(select(Sponsor).where(Sponsor.season_id == season_id)
+    res = await db.execute(select(Sponsor).options(defer(Sponsor.logo))
+                           .where(Sponsor.season_id == season_id)
                            .order_by(Sponsor.created_at.desc()))
     return [_sponsor_out(s) for s in res.scalars().unique()]
 
@@ -354,7 +379,7 @@ async def add_sponsor(season_id: uuid.UUID, body: SponsorIn, user: Admin, db: DB
                  message=_clean(body.message))
     if body.logo:
         try:
-            sp.logo, sp.logo_mime = S.decode_logo(body.logo)
+            S.set_logo(sp, body.logo)
         except S.SponsorError as exc:
             raise _bad(str(exc))
     db.add(sp)
@@ -377,6 +402,7 @@ async def patch_sponsor(sponsor_id: uuid.UUID, body: SponsorPatch, user: Admin, 
     if data.get("tier_id"):
         tier = await _tier(db, data["tier_id"], sp.season_id)
     if new_status == SponsorStatus.APPROVED and tier and (tier.id != sp.tier_id or sp.status != new_status):
+        # (sem cota, a aprovação é barrada mais abaixo)
         if not await S.tier_has_room(db, tier, exclude=sp.id):
             raise _bad(f"A cota {tier.name} já está cheia ({tier.slots} vaga(s)).")
     if tier and tier.id != sp.tier_id:
@@ -385,7 +411,7 @@ async def patch_sponsor(sponsor_id: uuid.UUID, body: SponsorPatch, user: Admin, 
         await db.refresh(sp, ["tier"])
     if body.logo:
         try:
-            sp.logo, sp.logo_mime = S.decode_logo(body.logo)
+            S.set_logo(sp, body.logo)
         except S.SponsorError as exc:
             raise _bad(str(exc))
     if data.get("company"):
@@ -398,8 +424,10 @@ async def patch_sponsor(sponsor_id: uuid.UUID, body: SponsorPatch, user: Admin, 
         sp.visible_until = data["visible_until"]
     if body.status and body.status != sp.status:
         if body.status == SponsorStatus.APPROVED:
-            if not sp.logo:
+            if not sp.logo_version:
                 raise _bad("Sem logo ainda: envie a logo antes de aprovar.")
+            if not sp.tier:
+                raise _bad("Escolha uma cota antes de aprovar.")
             sp.approved_at = utcnow()
             # prazo vazio ou já vencido (reaprovação) recomeça pela cota,
             # a menos que o admin tenha mandado a data nesta mesma requisição
